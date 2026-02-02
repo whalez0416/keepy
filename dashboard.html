@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 병의원 통합 관리 대시보드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2C64F8;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #1E293B;
+            --text-sub: #64748B;
+            --success: #10B981;
+            --danger: #EF4444;
+            --accent: #F59E0B;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 260px;
+            background: #0F172A;
+            color: white;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+            color: var(--primary);
+        }
+
+        nav ul {
+            list-style: none;
+        }
+
+        nav li {
+            padding: 1rem 0;
+            color: #94A3B8;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        nav li.active {
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            padding: 2rem 3rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Main Monitoring Card */
+        .monitor-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .site-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--success);
+            margin-bottom: 1rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .control-item h3 {
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #CBD5E1;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        .price-tag {
+            background: #F1F5F9;
+            padding: 1.5rem;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        .price-value {
+            color: var(--primary);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <aside>
+        <div class="logo">Keepy</div>
+        <nav>
+            <ul>
+                <li class="active">대시보드</li>
+                <li>모니터링 설정</li>
+                <li>결제 내역</li>
+                <li>고객센터</li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <header>
+            <h1>관리 대시보드</h1>
+            <div class="user-info">
+                <span>민병원 원장님</span>
+                <div style="width: 40px; height: 40px; background: #E2E8F0; border-radius: 50%;"></div>
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">오늘 삭제된 스팸</div>
+                <div class="stat-value">24개</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">자동 복구 횟수</div>
+                <div class="stat-value">1회</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">업타임 (24h)</div>
+                <div class="stat-value">99.9%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">이번 달 예상 요금</div>
+                <div class="stat-value">35,000원</div>
+            </div>
+        </div>
+
+        <div class="monitor-card">
+            <div class="site-status">
+                <div class="status-dot"></div>
+                민병원 홈페이지 정상 작동 중
+            </div>
+            <p style="color: var(--text-sub);">최근 점검: 32초 전 (https://minhospital.co.kr)</p>
+
+            <div class="control-panel">
+                <div class="control-item">
+                    <h3>가변 모니터링 주기 설정</h3>
+                    <select id="intervalSelect" onchange="updatePrice()">
+                        <option value="1">1분 (가장 안전 / 50,000원)</option>
+                        <option value="3">3분 (추천 / 40,000원)</option>
+                        <option value="5" selected>5분 (보통 / 30,000원)</option>
+                        <option value="10">10분 (가성비 / 10,000원)</option>
+                    </select>
+                    <div class="price-tag">
+                        <span>월 예상 청구 금액</span>
+                        <span class="price-value" id="priceDisplay">30,000원</span>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <h3>셀프 힐링 (서버 자가 복구)</h3>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                        <input type="checkbox" checked style="width: auto;"> 
+                        장애 감지 시 서버 자동 재시작 활성화
+                    </label>
+                    <button class="btn-primary" onclick="alert('설정이 저장되었습니다.')">설정 변경 저장</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const priceMap = {
+            1: '50,000원',
+            3: '40,000원',
+            5: '30,000원',
+            10: '10,000원'
+        };
+
+        function updatePrice() {
+            const interval = document.getElementById('intervalSelect').value;
+            document.getElementById('priceDisplay').innerText = priceMap[interval];
+        }
+    </script>
+</body>
+</html>

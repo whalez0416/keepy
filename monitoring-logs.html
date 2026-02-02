@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 실시간 모니터링 로그</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', 'Courier New', monospace;
+        }
+
+        body {
+            background: #0F172A;
+            color: #E2E8F0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: #1E293B;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #2C64F8;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #2C64F8;
+        }
+
+        .status {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: #10B981;
+        }
+
+        .status-dot.inactive {
+            background: #64748B;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .log-container {
+            background: #000000;
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #1E293B;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: #64748B;
+            margin-right: 1rem;
+        }
+
+        .log-site {
+            color: #2C64F8;
+            font-weight: 600;
+            margin-right: 1rem;
+        }
+
+        .log-status {
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+
+        .log-status.INFO {
+            background: #1E40AF;
+            color: #DBEAFE;
+        }
+
+        .log-status.SUCCESS {
+            background: #065F46;
+            color: #D1FAE5;
+        }
+
+        .log-status.ERROR {
+            background: #991B1B;
+            color: #FEE2E2;
+        }
+
+        .log-message {
+            color: #E2E8F0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: #2C64F8;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1E40AF;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #64748B;
+        }
+
+        .auto-scroll {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #94A3B8;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Keepy 실시간 모니터링 로그</h1>
+            <p style="color: #94A3B8; margin-top: 0.5rem;">민병원 모니터링 상태를 실시간으로 확인하세요</p>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot" id="apiStatus"></div>
+                    <span id="apiStatusText">API 연결 확인 중...</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="monitorStatus"></div>
+                    <span id="monitorStatusText">모니터링 대기 중...</span>
+                </div>
+                <div class="status-item">
+                    <span>총 로그: <strong id="logCount">0</strong>개</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="fetchLogs()">🔄 새로고침</button>
+            <button class="btn-secondary" onclick="clearDisplay()">🗑️ 화면 지우기</button>
+            <label class="auto-scroll">
+                <input type="checkbox" id="autoScroll" checked>
+                자동 스크롤
+            </label>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div class="empty-state">로그를 불러오는 중...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let autoRefreshInterval = null;
+
+        async function checkAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    document.getElementById('apiStatus').className = 'status-dot active';
+                    document.getElementById('apiStatusText').textContent = 'API 연결됨';
+                    return true;
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').className = 'status-dot inactive';
+                document.getElementById('apiStatusText').textContent = 'API 연결 실패';
+                return false;
+            }
+        }
+
+        async function fetchLogs() {
+            const container = document.getElementById('logContainer');
+
+            try {
+                const response = await fetch(`${API_BASE}/monitoring/logs`);
+                const logs = await response.json();
+
+                document.getElementById('logCount').textContent = logs.length;
+
+                if (logs.length === 0) {
+                    container.innerHTML = '<div class="empty-state">아직 모니터링 로그가 없습니다.<br>민병원을 등록하면 1분마다 자동으로 체크합니다.</div>';
+                    document.getElementById('monitorStatus').className = 'status-dot inactive';
+                    document.getElementById('monitorStatusText').textContent = '모니터링 대기 중';
+                } else {
+                    document.getElementById('monitorStatus').className = 'status-dot active';
+                    document.getElementById('monitorStatusText').textContent = '모니터링 활성';
+
+                    container.innerHTML = logs.map(log => {
+                        const timestamp = new Date(log.timestamp).toLocaleTimeString('ko-KR');
+                        return `
+                            <div class="log-entry">
+                                <span class="log-timestamp">[${timestamp}]</span>
+                                <span class="log-site">[${log.site_name}]</span>
+                                <span class="log-status ${log.status}">${log.status}</span>
+                                <span class="log-message">${log.message}</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Auto scroll to bottom if enabled
+                    if (document.getElementById('autoScroll').checked) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state">❌ 로그를 불러올 수 없습니다.</div>';
+            }
+        }
+
+        function clearDisplay() {
+            document.getElementById('logContainer').innerHTML = '<div class="empty-state">화면이 지워졌습니다. 새로고침을 눌러 다시 불러오세요.</div>';
+        }
+
+        async function init() {
+            await checkAPI();
+            await fetchLogs();
+
+            // Auto refresh every 3 seconds
+            autoRefreshInterval = setInterval(async () => {
+                await checkAPI();
+                await fetchLogs();
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

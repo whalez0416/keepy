@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 안전 시각화 시뮬레이터</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2C64F8;
+            --bg: #F1F5F9;
+            --hospital-bg: #FFFFFF;
+            --keepy-blue: #0F172A;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            padding: 2rem;
+            color: #1E293B;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h2 {
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* 가상 병원 홈페이지 */
+        .hospital-side {
+            background: var(--hospital-bg);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 2px solid #E2E8F0;
+        }
+
+        .site-header {
+            border-bottom: 1px solid #CBD5E1;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .site-status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-up {
+            background: #DCFCE7;
+            color: #166534;
+        }
+
+        .status-down {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .board {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 1rem;
+            min-height: 300px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .post {
+            background: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border-left: 4px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .post.spam {
+            border-left-color: var(--danger);
+            background: #FFF1F2;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Keepy 관리자 */
+        .keepy-side {
+            background: var(--keepy-blue);
+            color: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group {
+            margin-bottom: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 12px;
+        }
+
+        .label {
+            color: #94A3B8;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .log-area {
+            background: black;
+            color: #4ADE80;
+            font-family: monospace;
+            font-size: 0.85rem;
+            padding: 1rem;
+            border-radius: 8px;
+            height: 150px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-attack {
+            background: var(--danger);
+            color: white;
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .btn-kill {
+            background: var(--warning);
+            color: black;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: #334155;
+            color: white;
+            border: none;
+            margin-top: 0.5rem;
+        }
+
+        /* 시각화 장치 */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1>🛡️ Keepy 안전 시뮬레이터</h1>
+        <p style="color: #64748B;">실제 사이트 영향 ZERO! 안심하고 테스트해보세요.</p>
+    </div>
+
+    <div class="container">
+        <!-- 왼쪽: 가상 병원 홈페이지 -->
+        <div class="hospital-side">
+            <div class="site-header">
+                <h2 id="siteName">🏥 민병원 자유게시판</h2>
+                <div id="siteStatus" class="site-status-badge status-up">SITE UP</div>
+                <p style="font-size: 0.8rem; color: #64748B; margin-top: 0.5rem;">URL: https://min-hospital.test.com</p>
+            </div>
+
+            <div class="board" id="board">
+                <div class="post">안녕하세요, 무릎 수납 질문 드립니다. <span style="font-size: 0.7rem; color: #94A3B8;">10:00</span>
+                </div>
+                <div class="post">어제 수술 잘 받았습니다. 감사합니다. <span style="font-size: 0.7rem; color: #94A3B8;">10:05</span>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: 2rem; padding: 1rem; background: #FFFBEB; border-radius: 12px; border: 1px solid #FEF3C7;">
+                <p style="font-size: 0.9rem; font-weight: 700;">🚨 테스트 컨트롤러 (공격용)</p>
+                <button class="btn-attack" onclick="injectSpam()">👾 대량 스팸 공격 퍼붓기</button>
+                <button class="btn-kill" onclick="killServer()">⚡ 서버 강제 다운시키기</button>
+            </div>
+        </div>
+
+        <!-- 오른쪽: Keepy 관리 창 -->
+        <div class="keepy-side">
+            <h2>🛡️ Keepy AI 관리 센터</h2>
+
+            <div class="control-group">
+                <div class="label">가변 모니터링 주기</div>
+                <select id="interval" onchange="changeInterval()">
+                    <option value="1">1분 (가장 빠름 / 5만원)</option>
+                    <option value="5" selected>5분 (보통 / 3만원)</option>
+                    <option value="10">10분 (가성비 / 1만원)</option>
+                </select>
+                <div class="progress-bar">
+                    <div id="progress" class="progress-fill"></div>
+                </div>
+                <p id="timerLabel" style="font-size: 0.7rem; color: #94A3B8; margin-top: 0.3rem;">다음 점검까지 5초 남음</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="control-group">
+                    <div class="label">오늘의 청소 완료</div>
+                    <div class="value" id="cleanedCount">0건</div>
+                </div>
+                <div class="control-group">
+                    <div class="label">결제 금액(정산)</div>
+                    <div class="value" id="priceLabel">30,000원</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="label">가동 실시간 로그</div>
+                <div class="log-area" id="logs">
+                    [SYSEM] Keepy Engine Ready...
+                    [INFO] Monitoring Site: min-hospital.test.com
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let spamCount = 0;
+        let cleanedTotal = 0;
+        let isDown = false;
+        let timer = 5;
+        let maxTimer = 5;
+        let price = 30000;
+
+        const board = document.getElementById('board');
+        const logs = document.getElementById('logs');
+        const cleanedLabel = document.getElementById('cleanedCount');
+        const progress = document.getElementById('progress');
+        const timerLabel = document.getElementById('timerLabel');
+
+        function addLog(msg, color = '#4ADE80') {
+            const time = new Date().toLocaleTimeString();
+            logs.innerHTML += `<div style="color: ${color}">[${time}] ${msg}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function injectSpam() {
+            for (let i = 0; i < 5; i++) {
+                const div = document.createElement('div');
+                div.className = 'post spam';
+                div.innerHTML = `[SPAM] 도박/성인 잭팟 찬스!! 클릭!! <span style="font-size: 0.7rem; color: #94A3B8;">NOW</span>`;
+                board.prepend(div);
+                spamCount++;
+            }
+            addLog("🚨 위험 감지: 대량 게시글 등록 패턴 발견!", "var(--danger)");
+        }
+
+        function killServer() {
+            isDown = true;
+            document.getElementById('siteStatus').className = 'site-status-badge status-down';
+            document.getElementById('siteStatus').innerText = 'SITE DOWN';
+            addLog("❌ 장애 감지: 사이트 응답 없음!!!", "var(--danger)");
+        }
+
+        function changeInterval() {
+            const val = parseInt(document.getElementById('interval').value);
+            maxTimer = val;
+            timer = val;
+            price = val === 1 ? 50000 : (val === 5 ? 30000 : 10000);
+            document.getElementById('priceLabel').innerText = price.toLocaleString() + "원";
+            addLog(`⚙️ 설정 변경: 점검 주기를 ${val}분으로 조정함.`);
+        }
+
+        // 시뮬레이션 루프 (1초마다)
+        setInterval(() => {
+            timer--;
+            if (timer <= 0) {
+                timer = maxTimer;
+                performCheck();
+            }
+            progress.style.width = ((maxTimer - timer) / maxTimer * 100) + "%";
+            timerLabel.innerText = `다음 점검까지 ${timer}초 남음`;
+        }, 1000);
+
+        function performCheck() {
+            addLog("🔍 정기 보안 점검 수행 중...");
+
+            // 1. 스팸 체크
+            if (spamCount > 0) {
+                const spams = document.querySelectorAll('.post.spam');
+                spams.forEach(s => s.remove());
+                cleanedTotal += spamCount;
+                addLog(`✅ 스팸 헌터: 게시글 ${spamCount}개 삭제 완료 및 IP 차단!`, "var(--success)");
+                cleanedLabel.innerText = cleanedTotal + "건";
+                spamCount = 0;
+            }
+
+            // 2. 서버 체크 (Self-Healing)
+            if (isDown) {
+                addLog("🚑 셀프 힐링: 서버 재시작 명령 전송 중...", "var(--warning)");
+                setTimeout(() => {
+                    isDown = false;
+                    document.getElementById('siteStatus').className = 'site-status-badge status-up';
+                    document.getElementById('siteStatus').innerText = 'SITE UP';
+                    addLog("✨ 복구 완료: 서버가 정상 작동합니다.", "var(--success)");
+                }, 2000);
+            }
+        }
+    </script>
+
+</body>
+
+</html>

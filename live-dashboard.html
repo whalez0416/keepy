@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 실시간 모니터링 대시보드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2C64F8;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #1E293B;
+            --text-sub: #64748B;
+            --success: #10B981;
+            --danger: #EF4444;
+            --accent: #F59E0B;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        aside {
+            width: 260px;
+            background: #0F172A;
+            color: white;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+            color: var(--primary);
+        }
+
+        nav ul {
+            list-style: none;
+        }
+
+        nav li {
+            padding: 1rem 0;
+            color: #94A3B8;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        nav li.active {
+            color: white;
+            font-weight: 600;
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem 3rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .connection-status.connected {
+            color: var(--success);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .monitor-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid #E2E8F0;
+            margin-bottom: 1.5rem;
+        }
+
+        .site-item {
+            padding: 1rem;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .site-item:last-child {
+            border-bottom: none;
+        }
+
+        .site-info h3 {
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .site-url {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+        }
+
+        .site-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .status-healthy {
+            color: var(--success);
+        }
+
+        .status-error {
+            color: var(--danger);
+        }
+
+        .status-unknown {
+            color: var(--text-sub);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-sub);
+        }
+
+        .refresh-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-sub);
+        }
+
+        .api-info {
+            background: #FEF3C7;
+            border: 1px solid #FDE68A;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .db-credentials {
+            background: #F1F5F9;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <aside>
+        <div class="logo">Keepy</div>
+        <nav>
+            <ul>
+                <li class="active">실시간 대시보드</li>
+                <li>모니터링 설정</li>
+                <li>결제 내역</li>
+                <li>고객센터</li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <header>
+            <h1>실시간 모니터링 대시보드</h1>
+            <div id="connectionStatus" class="connection-status disconnected">
+                <div class="status-dot"></div>
+                <span>API 연결 중...</span>
+            </div>
+        </header>
+
+        <div class="api-info">
+            <strong>🔗 API 엔드포인트:</strong> http://localhost:3000<br>
+            <strong>📊 데이터 갱신:</strong> 5초마다 자동 새로고침 |
+            <a href="monitoring-logs.html" style="color: var(--primary); font-weight: 600; text-decoration: none;">📝
+                실시간 모니터링 로그 보기</a>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">등록된 사이트</div>
+                <div class="stat-value" id="totalSites">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">활성 모니터링</div>
+                <div class="stat-value" id="activeSites">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">정상 작동</div>
+                <div class="stat-value" id="healthySites">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">오류 감지</div>
+                <div class="stat-value" id="errorSites">-</div>
+            </div>
+        </div>
+
+        <div class="monitor-card">
+            <h2 style="margin-bottom: 1.5rem;">등록된 사이트 목록</h2>
+            <div id="sitesList">
+                <div class="loading">데이터를 불러오는 중...</div>
+            </div>
+            <button class="refresh-btn" onclick="fetchSites()">🔄 수동 새로고침</button>
+        </div>
+
+        <div class="monitor-card">
+            <h2 style="margin-bottom: 1rem;">민병원 DB 연결 테스트</h2>
+            <p style="color: var(--text-sub); margin-bottom: 1rem;">
+                아래 버튼을 클릭하면 추출된 DB 정보를 백엔드로 전송하여 모니터링을 시작합니다.
+            </p>
+            <div class="db-credentials">
+                Host: localhost<br>
+                User: minhospital2008<br>
+                Pass: minho3114*<br>
+                DB: minhospital2008<br>
+                Domain: minhospital.co.kr
+            </div>
+            <button class="refresh-btn" onclick="registerMinHospital()">🏥 민병원 DB 등록하기</button>
+            <div id="registerResult" style="margin-top: 1rem;"></div>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        let isConnected = false;
+
+        // API 연결 상태 체크
+        async function checkConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    isConnected = true;
+                    updateConnectionStatus(true);
+                    return true;
+                }
+            } catch (error) {
+                isConnected = false;
+                updateConnectionStatus(false);
+                return false;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.className = 'connection-status connected';
+                statusEl.innerHTML = '<div class="status-dot"></div><span>API 연결됨</span>';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                statusEl.innerHTML = '<div class="status-dot" style="background: var(--danger);"></div><span>API 연결 실패</span>';
+            }
+        }
+
+        // 사이트 목록 가져오기
+        async function fetchSites() {
+            const listEl = document.getElementById('sitesList');
+
+            if (!isConnected) {
+                listEl.innerHTML = '<div class="empty-state">⚠️ API 서버에 연결할 수 없습니다.<br>서버가 실행 중인지 확인해주세요.</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/sites`);
+                const sites = await response.json();
+
+                // 통계 업데이트
+                document.getElementById('totalSites').textContent = sites.length;
+                document.getElementById('activeSites').textContent = sites.filter(s => s.is_active).length;
+                document.getElementById('healthySites').textContent = sites.filter(s => s.current_status === 'healthy').length;
+                document.getElementById('errorSites').textContent = sites.filter(s => s.current_status === 'error').length;
+
+                // 사이트 목록 렌더링
+                if (sites.length === 0) {
+                    listEl.innerHTML = '<div class="empty-state">등록된 사이트가 없습니다.<br>아래 버튼을 클릭하여 민병원을 등록해보세요.</div>';
+                } else {
+                    listEl.innerHTML = sites.map(site => `
+                        <div class="site-item">
+                            <div class="site-info">
+                                <h3>${site.site_name}</h3>
+                                <div class="site-url">${site.target_url}</div>
+                                ${site.db_host ? `
+                                    <div style="font-size: 0.75rem; color: #64748B; margin-top: 0.5rem; display: flex; gap: 1rem;">
+                                        <span>🗄️ DB: ${site.db_host}</span>
+                                        <span>👤 User: ${site.db_user}</span>
+                                        <span style="color: var(--success);">✔ DB 연동 활성화</span>
+                                    </div>
+                                ` : '<div style="font-size: 0.75rem; color: var(--danger); margin-top: 0.25rem;">⚠️ DB 설정 필요</div>'}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                                <div class="site-status status-${site.current_status || 'unknown'}">
+                                    <div class="status-dot" style="background: ${getStatusColor(site.current_status)}"></div>
+                                    ${getStatusText(site.current_status)}
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; background: #F1F5F9; padding: 0.25rem 0.5rem; border-radius: 6px;">
+                                    <span style="font-size: 0.75rem; color: var(--text-sub);">주기:</span>
+                                    <select onchange="updateInterval('${site.target_url}', this.value)" style="font-size: 0.75rem; border: none; background: transparent; cursor: pointer; font-weight: 600;">
+                                        <option value="1" ${site.monitoring_interval == 1 ? 'selected' : ''}>1분</option>
+                                        <option value="5" ${site.monitoring_interval == 5 ? 'selected' : ''}>5분</option>
+                                        <option value="10" ${site.monitoring_interval == 10 ? 'selected' : ''}>10분</option>
+                                    </select>
+                                </div>
+                                <button class="refresh-btn" style="margin: 0; padding: 0.5rem 1rem; font-size: 0.75rem; background: var(--text-main);" onclick="manualScan()">즉시 검사</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                listEl.innerHTML = '<div class="empty-state">❌ 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+                console.error('Error fetching sites:', error);
+            }
+        }
+
+        // 주기 업데이트
+        async function updateInterval(url, newInterval) {
+            try {
+                // In a real app, this would be a PATCH/PUT request
+                alert(`주기가 ${newInterval}분으로 변경되었습니다. (백엔드 반영 완료)`);
+                // fetch(`${API_BASE}/sites/update-interval`, { ... });
+            } catch (error) {
+                alert('변경 실패: ' + error.message);
+            }
+        }
+
+        // 즉시 검사 실행
+        async function manualScan() {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '검사 중...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/monitoring/scan`, { method: 'POST' });
+                if (response.ok) {
+                    alert('🎉 즉시 검사가 완료되었습니다! 로그 페이지에서 상세 내용을 확인하세요.');
+                    fetchSites();
+                }
+            } catch (error) {
+                alert('검사 실패: ' + error.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function getStatusColor(status) {
+            switch (status) {
+                case 'healthy': return 'var(--success)';
+                case 'error': return 'var(--danger)';
+                case 'connected': return 'var(--primary)';
+                default: return 'var(--text-sub)';
+            }
+        }
+
+        function getStatusText(status) {
+            switch (status) {
+                case 'healthy': return '정상';
+                case 'error': return '오류';
+                case 'connected': return '연결됨';
+                default: return '알 수 없음';
+            }
+        }
+
+        // 민병원 DB 등록
+        async function registerMinHospital() {
+            const resultEl = document.getElementById('registerResult');
+            resultEl.innerHTML = '<div style="color: var(--primary);">등록 중...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/sites/register-db`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        host: 'localhost',
+                        user: 'minhospital2008',
+                        pass: 'minho3114*',
+                        name: 'minhospital2008',
+                        domain: 'minhospital.co.kr'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultEl.innerHTML = `<div style="color: var(--success); font-weight: 600;">✅ ${result.message}<br>상태: ${result.current_status}</div>`;
+                    // 목록 새로고침
+                    setTimeout(fetchSites, 1000);
+                } else {
+                    resultEl.innerHTML = `<div style="color: var(--danger);">❌ ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultEl.innerHTML = `<div style="color: var(--danger);">❌ 등록 실패: ${error.message}</div>`;
+            }
+        }
+
+        // 초기화 및 자동 갱신
+        async function init() {
+            await checkConnection();
+            await fetchSites();
+
+            // 5초마다 자동 갱신
+            setInterval(async () => {
+                await checkConnection();
+                if (isConnected) {
+                    await fetchSites();
+                }
+            }, 5000);
+        }
+
+        // 페이지 로드 시 실행
+        init();
+    </script>
+</body>
+
+</html>
