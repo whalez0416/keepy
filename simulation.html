@@ -246,9 +246,9 @@
             <div class="control-group">
                 <div class="label">가변 모니터링 주기</div>
                 <select id="interval" onchange="changeInterval()">
-                    <option value="1">1분 (가장 빠름 / 5만원)</option>
-                    <option value="5" selected>5분 (보통 / 3만원)</option>
-                    <option value="10">10분 (가성비 / 1만원)</option>
+                    <option value="1">1분 (가장 빠름 / 29,800원)</option>
+                    <option value="3">3분 (추천 / 19,800원)</option>
+                    <option value="5" selected>5분 (보통 / 9,900원)</option>
                 </select>
                 <div class="progress-bar">
                     <div id="progress" class="progress-fill"></div>
@@ -263,7 +263,7 @@
                 </div>
                 <div class="control-group">
                     <div class="label">결제 금액(정산)</div>
-                    <div class="value" id="priceLabel">30,000원</div>
+                    <div class="value" id="priceLabel">9,900원</div>
                 </div>
             </div>
 
@@ -283,7 +283,7 @@
         let isDown = false;
         let timer = 5;
         let maxTimer = 5;
-        let price = 30000;
+        let price = 9900;
 
         const board = document.getElementById('board');
         const logs = document.getElementById('logs');
@@ -319,7 +319,12 @@
             const val = parseInt(document.getElementById('interval').value);
             maxTimer = val;
             timer = val;
-            price = val === 1 ? 50000 : (val === 5 ? 30000 : 10000);
+            const priceMap = {
+                1: 29800,
+                3: 19800,
+                5: 9900
+            };
+            price = priceMap[val] || 9900;
             document.getElementById('priceLabel').innerText = price.toLocaleString() + "원";
             addLog(`⚙️ 설정 변경: 점검 주기를 ${val}분으로 조정함.`);
         }

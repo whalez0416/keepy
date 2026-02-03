@@ -216,6 +216,7 @@
                 <li onclick="switchTab('dashboard', this)" class="active">대시보드</li>
                 <li onclick="switchTab('settings', this)">모니터링 설정</li>
                 <li onclick="switchTab('billing', this)">결제 내역</li>
+                <li onclick="switchTab('profile', this)">내 정보 수정</li>
                 <li onclick="switchTab('support', this)">고객센터</li>
                 <li id="adminMenuItem" class="admin-only" onclick="window.location.href='/admin'"
                     style="border-top: 1px solid #334155; margin-top: 1rem; padding-top: 1.5rem;">🛡️ 관리자 페이지</li>
@@ -227,7 +228,17 @@
         <header>
             <h1 id="pageTitle">관리 대시보드</h1>
             <div class="user-info">
-                <span>민병원 원장님</span>
+                <div style="text-align: right; margin-right: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;">
+                        <span id="userNameLabel" style="font-weight: 600;">민병원 원장님</span>
+                        <div id="userRoleBadge"
+                            style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: #334155; color: white;">
+                            User</div>
+                    </div>
+                    <div onclick="logout()"
+                        style="font-size: 0.75rem; color: var(--text-sub); cursor: pointer; margin-top: 2px; text-decoration: underline;">
+                        로그아웃</div>
+                </div>
                 <div style="width: 40px; height: 40px; background: #E2E8F0; border-radius: 50%;"></div>
             </div>
         </header>
@@ -248,7 +259,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">이번 달 예상 요금</div>
-                    <div class="stat-value" id="estPrice">35,000원</div>
+                    <div class="stat-value" id="estPrice">19,800원</div>
                 </div>
             </div>
 
@@ -263,14 +274,13 @@
                     <div class="control-item">
                         <h3>가변 모니터링 주기 설정</h3>
                         <select id="intervalSelect" onchange="updatePrice()">
-                            <option value="1">1분 (가장 안전 / 50,000원)</option>
-                            <option value="3">3분 (추천 / 40,000원)</option>
-                            <option value="5" selected>5분 (보통 / 30,000원)</option>
-                            <option value="10">10분 (가성비 / 10,000원)</option>
+                            <option value="1">1분 (가장 안전 / 29,800원)</option>
+                            <option value="3" selected>3분 (추천 / 19,800원)</option>
+                            <option value="5">5분 (보통 / 9,900원)</option>
                         </select>
                         <div class="price-tag">
                             <span>월 예상 청구 금액</span>
-                            <span class="price-value" id="priceDisplay">30,000원</span>
+                            <span class="price-value" id="priceDisplay">19,800원</span>
                         </div>
                     </div>
 
@@ -312,7 +322,7 @@
         <div id="section-billing" class="content-section" style="display: none;">
             <div class="monitor-card">
                 <h2>이번 달 결제 예정 금액</h2>
-                <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: 20px 0;">35,000원</div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: 20px 0;">19,800원</div>
                 <p style="color: var(--text-sub); margin-bottom: 30px;">결제일: 2026년 2월 25일</p>
 
                 <h3>결제 내역</h3>
@@ -320,13 +330,40 @@
                     <div
                         style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
                         <span>2026.01.25 정기결제</span>
-                        <span style="font-weight: 600;">35,000원</span>
+                        <span style="font-weight: 600;">19,800원</span>
                     </div>
                     <div
                         style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
                         <span>2025.12.25 정기결제</span>
-                        <span style="font-weight: 600;">35,000원</span>
+                        <span style="font-weight: 600;">19,800원</span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div id="section-profile" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>내 정보 수정</h2>
+                <div style="margin-top: 2rem;">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">이메일 (변경 불가)</label>
+                        <input type="email" id="profileEmail" disabled
+                            style="background: #f1f5f9; cursor: not-allowed; opacity: 0.7;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">이름</label>
+                        <input type="text" id="profileName">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">전화번호</label>
+                        <input type="text" id="profilePhone">
+                    </div>
+                    <div style="margin-bottom: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">새 비밀번호 (변경시에만 입력)</label>
+                        <input type="password" id="profilePassword" placeholder="새 비밀번호">
+                    </div>
+                    <button class="btn-primary" onclick="updateProfile()">정보 저장하기</button>
                 </div>
             </div>
         </div>
@@ -358,6 +395,13 @@
             document.getElementById('adminMenuItem').style.display = 'block';
         }
 
+        // Initialize User Info
+        document.getElementById('userNameLabel').innerText = `${user.name} 님`;
+        document.getElementById('userRoleBadge').innerText = user.role === 'admin' ? 'Admin' : 'User';
+        document.getElementById('profileEmail').value = user.email || '';
+        document.getElementById('profileName').value = user.name || '';
+        document.getElementById('profilePhone').value = user.phone || '';
+
         // Helper function to make authenticated requests
         async function authFetch(url, options = {}) {
             const headers = {
@@ -370,20 +414,45 @@
 
             // If unauthorized, redirect to login
             if (response.status === 401) {
-                localStorage.removeItem('keepy_token');
-                localStorage.removeItem('keepy_user');
-                window.location.href = '/login.html';
+                logout();
                 return null;
             }
 
             return response;
         }
 
+        async function updateProfile() {
+            const name = document.getElementById('profileName').value;
+            const phone = document.getElementById('profilePhone').value;
+            const password = document.getElementById('profilePassword').value;
+
+            const response = await authFetch('http://localhost:3000/auth/profile', {
+                method: 'PATCH',
+                body: JSON.stringify({ name, phone, password: password || undefined })
+            });
+
+            if (!response) return;
+
+            const data = await response.json();
+            alert('정보가 수정되었습니다.');
+
+            // Update local storage and UI
+            const updatedUser = { ...user, name: data.user.name, phone: data.user.phone };
+            localStorage.setItem('keepy_user', JSON.stringify(updatedUser));
+            document.getElementById('userNameLabel').innerText = `${updatedUser.name} 님`;
+            document.getElementById('profilePassword').value = '';
+        }
+
+        function logout() {
+            localStorage.removeItem('keepy_token');
+            localStorage.removeItem('keepy_user');
+            window.location.href = '/login.html';
+        }
+
         const priceMap = {
-            1: '50,000원',
-            3: '40,000원',
-            5: '30,000원',
-            10: '10,000원'
+            1: '29,800원',
+            3: '19,800원',
+            5: '9,900원'
         };
 
         function updatePrice() {
@@ -461,6 +530,7 @@
                 'dashboard': '관리 대시보드',
                 'settings': '모니터링 설정',
                 'billing': '결제 내역',
+                'profile': '내 정보 수정',
                 'support': '고객센터'
             };
             document.getElementById('pageTitle').innerText = titles[tabId];

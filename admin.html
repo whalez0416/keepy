@@ -255,12 +255,19 @@
             font-size: 14px;
         }
 
-        .form-group select {
+        .form-group select,
+        .inline-select {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .inline-select {
+            width: auto;
+            min-width: 100px;
         }
 
         .info-grid {
@@ -414,12 +421,25 @@
                             <tr>
                                 <td>${user.name}</td>
                                 <td>${user.email}</td>
-                                <td><span class="badge badge-${user.role}">${user.role}</span></td>
-                                <td><span class="badge badge-${user.subscription_type}">${user.subscription_type}</span></td>
+                                <td>
+                                    <select class="inline-select" id="role-${user.id}">
+                                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="inline-select" id="sub-${user.id}">
+                                        <option value="free" ${user.subscription_type === 'free' ? 'selected' : ''}>Free</option>
+                                        <option value="basic" ${user.subscription_type === 'basic' ? 'selected' : ''}>Basic</option>
+                                        <option value="pro" ${user.subscription_type === 'pro' ? 'selected' : ''}>Pro</option>
+                                        <option value="enterprise" ${user.subscription_type === 'enterprise' ? 'selected' : ''}>Enterprise</option>
+                                    </select>
+                                </td>
                                 <td>${user.site_count} (활성: ${user.active_sites})</td>
                                 <td>${new Date(user.created_at).toLocaleDateString('ko-KR')}</td>
-                                <td>
-                                    <button class="btn btn-primary" onclick="viewUser('${user.id}')">상세보기</button>
+                                <td style="display: flex; gap: 5px;">
+                                    <button class="btn btn-primary" style="padding: 6px 12px;" onclick="saveInlineUser('${user.id}')">저장</button>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px;" onclick="viewUser('${user.id}')">상세</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -509,7 +529,16 @@
         async function updateUser(userId) {
             const role = document.getElementById('roleSelect').value;
             const subscription_type = document.getElementById('subscriptionSelect').value;
+            await performUserUpdate(userId, role, subscription_type);
+        }
 
+        async function saveInlineUser(userId) {
+            const role = document.getElementById(`role-${userId}`).value;
+            const subscription_type = document.getElementById(`sub-${userId}`).value;
+            await performUserUpdate(userId, role, subscription_type);
+        }
+
+        async function performUserUpdate(userId, role, subscription_type) {
             const response = await authFetch(`http://localhost:3000/admin/users/${userId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ role, subscription_type })

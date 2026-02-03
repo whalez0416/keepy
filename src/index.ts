@@ -27,6 +27,7 @@ app.get("/health", (req: Request, res: Response) => {
 app.post("/auth/register", AuthController.register);
 app.post("/auth/login", AuthController.login);
 app.get("/auth/me", requireAuth, AuthController.getCurrentUser);
+app.patch("/auth/profile", requireAuth, AuthController.updateProfile);
 
 // Login Page (Public)
 app.get("/login.html", (req: Request, res: Response) => {
@@ -38,8 +39,8 @@ app.get("/dashboard", (req: Request, res: Response) => {
     res.sendFile(path.join(process.cwd(), "dashboard.html"));
 });
 
-// Admin Routes (Admin only)
-app.get("/admin", requireAuth, requireAdmin, (req: Request, res: Response) => {
+// Admin Routes (Admin only - Security handled in admin.html and API endpoints)
+app.get("/admin", (req: Request, res: Response) => {
     res.sendFile(path.join(process.cwd(), "admin.html"));
 });
 app.get("/admin/users", requireAuth, requireAdmin, AdminController.getAllUsers);

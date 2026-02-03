@@ -21,7 +21,8 @@ export class AuthController {
                 user: {
                     id: user.id,
                     email: user.email,
-                    name: user.name
+                    name: user.name,
+                    role: user.role
                 },
                 token
             });
@@ -49,7 +50,8 @@ export class AuthController {
                 user: {
                     id: user.id,
                     email: user.email,
-                    name: user.name
+                    name: user.name,
+                    role: user.role
                 },
                 token
             });
@@ -71,12 +73,39 @@ export class AuthController {
                     id: user.id,
                     email: user.email,
                     name: user.name,
-                    phone: user.phone
+                    phone: user.phone,
+                    role: user.role
                 }
             });
         } catch (error: any) {
             console.error('[Auth] Get user error:', error.message);
             res.status(500).json({ error: 'Failed to get user info' });
+        }
+    }
+
+    /**
+     * Update user profile
+     */
+    static async updateProfile(req: AuthRequest, res: Response) {
+        try {
+            const userId = req.user.id;
+            const { name, phone, password } = req.body;
+
+            const updatedUser = await AuthService.updateProfile(userId, { name, phone, password });
+
+            res.json({
+                message: 'Profile updated successfully',
+                user: {
+                    id: updatedUser.id,
+                    email: updatedUser.email,
+                    name: updatedUser.name,
+                    phone: updatedUser.phone,
+                    role: updatedUser.role
+                }
+            });
+        } catch (error: any) {
+            console.error('[Auth] Update profile error:', error.message);
+            res.status(400).json({ error: error.message });
         }
     }
 }

@@ -8,20 +8,13 @@ export class BillingService {
      * Let's use a fixed map for precision.
      */
     private static readonly PRICE_MAP: Record<number, number> = {
-        1: 50000,
-        2: 45000,
-        3: 40000,
-        4: 35000,
-        5: 30000,
-        6: 25000,
-        7: 20000,
-        8: 15000,
-        9: 12000, // Adjusted to fit 10k at 10m
-        10: 10000
+        1: 29800,
+        3: 19800,
+        5: 9900
     };
 
     static getMonthlyPrice(interval: number): number {
-        return this.PRICE_MAP[interval] || 10000;
+        return this.PRICE_MAP[interval] || 9900;
     }
 
     /**
