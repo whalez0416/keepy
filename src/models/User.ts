@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm";
-import { Site } from "./Site.js";
+import type { Site } from "./Site.js";
 
 @Entity("users")
 export class User {
@@ -18,7 +18,13 @@ export class User {
     @Column({ nullable: true })
     phone?: string;
 
-    @OneToMany(() => Site, (site) => site.user)
+    @Column({ default: "user" }) // "admin" or "user"
+    role!: string;
+
+    @Column({ default: "free" }) // "free", "basic", "pro", "enterprise"
+    subscription_type!: string;
+
+    @OneToMany("Site", "user")
     sites!: Site[];
 
     @CreateDateColumn()

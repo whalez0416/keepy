@@ -1,12 +1,12 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from "typeorm";
-import { User } from "./User.js";
+import type { User } from "./User.js";
 
 @Entity("sites")
 export class Site {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @ManyToOne(() => User, (user) => user.sites)
+    @ManyToOne("User", "sites")
     user!: User;
 
     @Column()
@@ -38,6 +38,9 @@ export class Site {
 
     @Column({ nullable: true })
     db_name?: string;
+
+    @Column({ nullable: true })
+    domain?: string; // 도메인 (예: minhospital.co.kr)
 
     @Column({ default: "unknown" })
     current_status!: string;

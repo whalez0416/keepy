@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,6 +63,14 @@
         nav li.active {
             color: white;
             font-weight: 600;
+        }
+
+        nav li:hover {
+            color: white;
+        }
+
+        .admin-only {
+            display: none;
         }
 
         /* Main Content */
@@ -135,9 +144,17 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         .control-panel {
@@ -152,7 +169,8 @@
             font-size: 1rem;
         }
 
-        select, input {
+        select,
+        input {
             width: 100%;
             padding: 0.75rem;
             border-radius: 8px;
@@ -189,82 +207,178 @@
         }
     </style>
 </head>
+
 <body>
     <aside>
         <div class="logo">Keepy</div>
         <nav>
             <ul>
-                <li class="active">대시보드</li>
-                <li>모니터링 설정</li>
-                <li>결제 내역</li>
-                <li>고객센터</li>
+                <li onclick="switchTab('dashboard', this)" class="active">대시보드</li>
+                <li onclick="switchTab('settings', this)">모니터링 설정</li>
+                <li onclick="switchTab('billing', this)">결제 내역</li>
+                <li onclick="switchTab('support', this)">고객센터</li>
+                <li id="adminMenuItem" class="admin-only" onclick="window.location.href='/admin'"
+                    style="border-top: 1px solid #334155; margin-top: 1rem; padding-top: 1.5rem;">🛡️ 관리자 페이지</li>
             </ul>
         </nav>
     </aside>
 
     <main>
         <header>
-            <h1>관리 대시보드</h1>
+            <h1 id="pageTitle">관리 대시보드</h1>
             <div class="user-info">
                 <span>민병원 원장님</span>
                 <div style="width: 40px; height: 40px; background: #E2E8F0; border-radius: 50%;"></div>
             </div>
         </header>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">오늘 삭제된 스팸</div>
-                <div class="stat-value">24개</div>
+        <div id="section-dashboard" class="content-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">오늘 삭제된 스팸</div>
+                    <div class="stat-value" id="spamCount">24개</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">자동 복구 횟수</div>
+                    <div class="stat-value" id="recoveryCount">1회</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">업타임 (24h)</div>
+                    <div class="stat-value" id="uptimeValue">99.9%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">이번 달 예상 요금</div>
+                    <div class="stat-value" id="estPrice">35,000원</div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">자동 복구 횟수</div>
-                <div class="stat-value">1회</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">업타임 (24h)</div>
-                <div class="stat-value">99.9%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">이번 달 예상 요금</div>
-                <div class="stat-value">35,000원</div>
+
+            <div class="monitor-card">
+                <div class="site-status">
+                    <div class="status-dot"></div>
+                    <span>민병원 홈페이지 정상 작동 중</span>
+                </div>
+                <p style="color: var(--text-sub);" id="lastChecked">최근 점검: 32초 전 (https://minhospital.co.kr)</p>
+
+                <div class="control-panel">
+                    <div class="control-item">
+                        <h3>가변 모니터링 주기 설정</h3>
+                        <select id="intervalSelect" onchange="updatePrice()">
+                            <option value="1">1분 (가장 안전 / 50,000원)</option>
+                            <option value="3">3분 (추천 / 40,000원)</option>
+                            <option value="5" selected>5분 (보통 / 30,000원)</option>
+                            <option value="10">10분 (가성비 / 10,000원)</option>
+                        </select>
+                        <div class="price-tag">
+                            <span>월 예상 청구 금액</span>
+                            <span class="price-value" id="priceDisplay">30,000원</span>
+                        </div>
+                    </div>
+
+                    <div class="control-item">
+                        <h3>셀프 힐링 (서버 자가 복구)</h3>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                            <input type="checkbox" checked style="width: auto;">
+                            장애 감지 시 서버 자동 재시작 활성화
+                        </label>
+                        <div style="display: flex; gap: 10px; width: 100%;">
+                            <button class="btn-primary" onclick="alert('설정이 저장되었습니다.')" style="flex: 1;">설정 저장</button>
+                            <button class="btn-primary" onclick="triggerManualScan()"
+                                style="background: var(--text-main); flex: 1;">즉시 검사</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="monitor-card">
-            <div class="site-status">
-                <div class="status-dot"></div>
-                민병원 홈페이지 정상 작동 중
+        <!-- Settings Section -->
+        <div id="section-settings" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>알림 설정</h2>
+                <div style="margin-top: 20px;">
+                    <label
+                        style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; justify-content: flex-start;">
+                        <input type="checkbox" checked style="width: auto; margin: 0;"> 장애 발생 시 문자 알림 (010-****-1234)
+                    </label>
+                    <label
+                        style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; justify-content: flex-start;">
+                        <input type="checkbox" checked style="width: auto; margin: 0;"> 스팸 자동 삭제 내역 주간 리포트 받기
+                    </label>
+                </div>
+                <button class="btn-primary" onclick="alert('알림 설정이 저장되었습니다.')" style="width: 200px;">저장</button>
             </div>
-            <p style="color: var(--text-sub);">최근 점검: 32초 전 (https://minhospital.co.kr)</p>
+        </div>
 
-            <div class="control-panel">
-                <div class="control-item">
-                    <h3>가변 모니터링 주기 설정</h3>
-                    <select id="intervalSelect" onchange="updatePrice()">
-                        <option value="1">1분 (가장 안전 / 50,000원)</option>
-                        <option value="3">3분 (추천 / 40,000원)</option>
-                        <option value="5" selected>5분 (보통 / 30,000원)</option>
-                        <option value="10">10분 (가성비 / 10,000원)</option>
-                    </select>
-                    <div class="price-tag">
-                        <span>월 예상 청구 금액</span>
-                        <span class="price-value" id="priceDisplay">30,000원</span>
+        <!-- Billing Section -->
+        <div id="section-billing" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>이번 달 결제 예정 금액</h2>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: 20px 0;">35,000원</div>
+                <p style="color: var(--text-sub); margin-bottom: 30px;">결제일: 2026년 2월 25일</p>
+
+                <h3>결제 내역</h3>
+                <div style="margin-top: 15px; border-top: 1px solid #e2e8f0;">
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span>2026.01.25 정기결제</span>
+                        <span style="font-weight: 600;">35,000원</span>
+                    </div>
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span>2025.12.25 정기결제</span>
+                        <span style="font-weight: 600;">35,000원</span>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="control-item">
-                    <h3>셀프 힐링 (서버 자가 복구)</h3>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-                        <input type="checkbox" checked style="width: auto;"> 
-                        장애 감지 시 서버 자동 재시작 활성화
-                    </label>
-                    <button class="btn-primary" onclick="alert('설정이 저장되었습니다.')">설정 변경 저장</button>
-                </div>
+        <!-- Support Section -->
+        <div id="section-support" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>1:1 문의하기</h2>
+                <p style="color: var(--text-sub); margin-bottom: 2rem;">궁금한 점이나 기술 지원이 필요하시면 언제든 문의해주세요.</p>
+                <input type="text" placeholder="문의 제목" style="margin-bottom: 10px;">
+                <textarea
+                    style="width: 100%; height: 200px; padding: 15px; border-radius: 8px; border: 1px solid #CBD5E1; resize: none;"
+                    placeholder="문의 내용을 입력해주세요."></textarea>
+                <button class="btn-primary" onclick="alert('문의가 접수되었습니다. 담당자가 곧 연락드리겠습니다.')">문의 접수하기</button>
             </div>
         </div>
     </main>
 
     <script>
+        // Check authentication on page load
+        const token = localStorage.getItem('keepy_token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Check if user is admin and show admin menu
+        const user = JSON.parse(localStorage.getItem('keepy_user') || '{}');
+        if (user.role === 'admin') {
+            document.getElementById('adminMenuItem').style.display = 'block';
+        }
+
+        // Helper function to make authenticated requests
+        async function authFetch(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...options.headers
+            };
+
+            const response = await fetch(url, { ...options, headers });
+
+            // If unauthorized, redirect to login
+            if (response.status === 401) {
+                localStorage.removeItem('keepy_token');
+                localStorage.removeItem('keepy_user');
+                window.location.href = '/login.html';
+                return null;
+            }
+
+            return response;
+        }
+
         const priceMap = {
             1: '50,000원',
             3: '40,000원',
@@ -276,6 +390,92 @@
             const interval = document.getElementById('intervalSelect').value;
             document.getElementById('priceDisplay').innerText = priceMap[interval];
         }
+
+        async function fetchDashboardData() {
+            try {
+                // 1. Fetch Sites (with auth)
+                const sitesRes = await authFetch('http://localhost:3000/sites');
+                if (!sitesRes) return;
+
+                const sites = await sitesRes.json();
+
+                if (sites.length > 0) {
+                    const site = sites[0]; // Primary site
+
+                    // Update Status
+                    const statusText = site.current_status === 'healthy' ? '정상 작동 중' : '장애 발생 확인';
+                    const statusColor = site.current_status === 'healthy' ? 'var(--success)' : 'var(--danger)';
+                    const statusDot = document.querySelector('.status-dot');
+                    const statusMsg = document.querySelector('.site-status span');
+
+                    if (statusDot) {
+                        statusDot.style.background = statusColor;
+                        statusDot.style.boxShadow = `0 0 10px ${statusColor}`;
+                    }
+                    if (statusMsg) {
+                        statusMsg.innerText = `${site.site_name} ${statusText}`;
+                        statusMsg.style.color = statusColor;
+                    }
+
+                    // Update Last Checked
+                    const lastChecked = document.getElementById('lastChecked');
+                    if (lastChecked) {
+                        lastChecked.innerText = `최근 점검: ${new Date().toLocaleTimeString()} (${site.target_url})`;
+                    }
+                }
+
+                // 2. Fetch Logs (with auth)
+                const logsRes = await authFetch('http://localhost:3000/monitoring/logs');
+                if (!logsRes) return;
+
+                const logs = await logsRes.json();
+
+                // Update Uptime (Mock calculation based on logs for now)
+                const errorCount = logs.filter(l => l.status === 'error').length;
+                const uptime = errorCount === 0 ? '100%' : '99.9%';
+                document.getElementById('uptimeValue').innerText = uptime;
+
+            } catch (error) {
+                console.error('Failed to fetch dashboard data:', error);
+            }
+        }
+
+        // Initial Load & Polling
+        fetchDashboardData();
+        setInterval(fetchDashboardData, 30000); // Refresh every 30s
+
+        async function triggerManualScan() {
+            if (!confirm('즉시 스팸 검사를 실행하시겠습니까?')) return;
+
+            const response = await authFetch('http://localhost:3000/monitoring/scan', { method: 'POST' });
+            if (!response) return;
+
+            const data = await response.json();
+            alert('검사가 시작되었습니다. 잠시 후 결과가 반영됩니다.');
+            fetchDashboardData(); // Refresh data immediately
+        }
+
+        function switchTab(tabId, element) {
+            // Update Title
+            const titles = {
+                'dashboard': '관리 대시보드',
+                'settings': '모니터링 설정',
+                'billing': '결제 내역',
+                'support': '고객센터'
+            };
+            document.getElementById('pageTitle').innerText = titles[tabId];
+
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(el => el.style.display = 'none');
+
+            // Show selected section
+            document.getElementById('section-' + tabId).style.display = 'block';
+
+            // Update Menu Active State
+            document.querySelectorAll('nav li').forEach(li => li.classList.remove('active'));
+            element.classList.add('active');
+        }
     </script>
 </body>
+
 </html>

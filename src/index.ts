@@ -1,11 +1,18 @@
 import "reflect-metadata";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { AppDataSource } from "./config/database.js";
-import { MonitorService } from "./services/monitor.service.js";
-import { SpamHunterService } from "./services/spam-hunter.service.js";
 import { BillingService } from "./services/billing.service.js";
 import { SiteController } from "./controllers/site.controller.simple.js";
+import { AuthController } from "./controllers/auth.controller.js";
+import { AdminController } from "./controllers/admin.controller.js";
+import { requireAuth } from "./middleware/auth.middleware.js";
+import { requireAdmin } from "./middleware/admin.middleware.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors()); // Enable CORS for all routes
@@ -16,11 +23,37 @@ app.get("/health", (req: Request, res: Response) => {
     res.json({ status: "ok", service: "Keepy Backend" });
 });
 
-app.post("/sites", SiteController.registerSite);
-app.post("/sites/register-db", SiteController.registerDB);
-app.get("/sites", SiteController.getAllSites);
-app.get("/monitoring/logs", SiteController.getMonitoringLogs);
-app.post("/monitoring/scan", SiteController.manualScan);
+// Auth Routes (Public)
+app.post("/auth/register", AuthController.register);
+app.post("/auth/login", AuthController.login);
+app.get("/auth/me", requireAuth, AuthController.getCurrentUser);
+
+// Login Page (Public)
+app.get("/login.html", (req: Request, res: Response) => {
+    res.sendFile(path.join(process.cwd(), "login.html"));
+});
+
+// Dashboard (Public for now, will add auth check in frontend)
+app.get("/dashboard", (req: Request, res: Response) => {
+    res.sendFile(path.join(process.cwd(), "dashboard.html"));
+});
+
+// Admin Routes (Admin only)
+app.get("/admin", requireAuth, requireAdmin, (req: Request, res: Response) => {
+    res.sendFile(path.join(process.cwd(), "admin.html"));
+});
+app.get("/admin/users", requireAuth, requireAdmin, AdminController.getAllUsers);
+app.get("/admin/users/:userId", requireAuth, requireAdmin, AdminController.getUserDetails);
+app.get("/admin/stats", requireAuth, requireAdmin, AdminController.getStats);
+app.patch("/admin/users/:userId", requireAuth, requireAdmin, AdminController.updateUser);
+
+// Site Routes (Protected)
+app.post("/sites", requireAuth, SiteController.registerSite);
+app.post("/sites/register-db", requireAuth, SiteController.registerDB);
+app.get("/sites", requireAuth, SiteController.getAllSites);
+app.get("/monitoring/logs", requireAuth, SiteController.getMonitoringLogs);
+app.post("/monitoring/scan", requireAuth, SiteController.manualScan);
+
 
 app.get("/billing/estimate", (req: Request, res: Response) => {
     const interval = parseInt(req.query.interval as string);

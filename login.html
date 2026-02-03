@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 로그인</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2C64F8;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            text-align: center;
+            color: #1E293B;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #64748B;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2C64F8;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            background: #2C64F8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: #1E4FD8;
+        }
+
+        .error {
+            background: #FEE2E2;
+            color: #DC2626;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .toggle-mode {
+            text-align: center;
+            margin-top: 1rem;
+            color: #64748B;
+        }
+
+        .toggle-mode a {
+            color: #2C64F8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="logo">Keepy</div>
+        <h2 id="formTitle">로그인</h2>
+
+        <div class="error" id="errorMsg"></div>
+
+        <form id="authForm">
+            <div class="form-group" id="nameGroup" style="display: none;">
+                <label>이름</label>
+                <input type="text" id="name" placeholder="홍길동">
+            </div>
+
+            <div class="form-group">
+                <label>이메일</label>
+                <input type="email" id="email" placeholder="example@hospital.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>비밀번호</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">로그인</button>
+        </form>
+
+        <div class="toggle-mode">
+            <span id="toggleText">계정이 없으신가요?</span>
+            <a href="#" id="toggleLink">회원가입</a>
+        </div>
+    </div>
+
+    <script>
+        let isLoginMode = true;
+
+        const form = document.getElementById('authForm');
+        const formTitle = document.getElementById('formTitle');
+        const submitBtn = document.getElementById('submitBtn');
+        const nameGroup = document.getElementById('nameGroup');
+        const toggleText = document.getElementById('toggleText');
+        const toggleLink = document.getElementById('toggleLink');
+        const errorMsg = document.getElementById('errorMsg');
+
+        // Toggle between login and register
+        toggleLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isLoginMode = !isLoginMode;
+
+            if (isLoginMode) {
+                formTitle.textContent = '로그인';
+                submitBtn.textContent = '로그인';
+                nameGroup.style.display = 'none';
+                toggleText.textContent = '계정이 없으신가요?';
+                toggleLink.textContent = '회원가입';
+            } else {
+                formTitle.textContent = '회원가입';
+                submitBtn.textContent = '가입하기';
+                nameGroup.style.display = 'block';
+                toggleText.textContent = '이미 계정이 있으신가요?';
+                toggleLink.textContent = '로그인';
+            }
+
+            errorMsg.style.display = 'none';
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value;
+
+            const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
+            const body = isLoginMode
+                ? { email, password }
+                : { email, password, name };
+
+            try {
+                const response = await fetch(`http://localhost:3000${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store token
+                    localStorage.setItem('keepy_token', data.token);
+                    localStorage.setItem('keepy_user', JSON.stringify(data.user));
+
+                    // Redirect to dashboard
+                    window.location.href = '/dashboard';
+                } else {
+                    errorMsg.textContent = data.error || '오류가 발생했습니다.';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (error) {
+                errorMsg.textContent = '서버 연결 실패. 잠시 후 다시 시도해주세요.';
+                errorMsg.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+
+</html>

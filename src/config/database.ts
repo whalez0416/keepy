@@ -2,6 +2,8 @@ import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { User } from "../models/User.js";
+import { Site } from "../models/Site.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,7 +19,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME || "keepy",
     synchronize: true, // Only for development
     logging: false,
-    entities: [join(__dirname, "/../models/*.{ts,js}")],
+    entities: [User, Site],
     migrations: [],
     subscribers: [],
 });

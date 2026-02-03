@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database.js";
 import { Site } from "../models/Site.js";
 import { User } from "../models/User.js";
 import { MonitorService } from "../services/monitor.service.js";
+import { registerSiteForMonitoring } from "./monitoring.scheduler.js";
 
 export class SiteController {
     static async registerSite(req: Request, res: Response) {
@@ -60,6 +61,22 @@ export class SiteController {
             const health = await monitor.checkHealth(site.target_url);
             site.current_status = health.success ? "healthy" : "error";
             await siteRepo.save(site);
+
+            // ⭐ Register to monitoring scheduler with domain
+            console.log(`[registerDB] Registering site with domain: ${domain}`);
+            registerSiteForMonitoring({
+                id: site.id,
+                site_name: site.site_name,
+                target_url: site.target_url,
+                monitoring_interval: site.monitoring_interval,
+                is_active: site.is_active,
+                current_status: site.current_status,
+                domain: domain, // ⭐ 도메인 추가
+                db_host: site.db_host,
+                db_user: site.db_user,
+                db_pass: site.db_pass,
+                db_name: site.db_name
+            });
 
             res.status(200).json({
                 status: "success",
