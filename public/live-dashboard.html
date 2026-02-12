@@ -371,7 +371,7 @@
                         <div class="site-item">
                             <div class="site-info">
                                 <h3>${site.site_name}</h3>
-                                <div class="site-url">${site.target_url}</div>
+                                <a href="${site.target_url}" target="_blank" class="site-url" style="display: block; text-decoration: none; color: var(--primary); margin-bottom: 0.5rem;">${site.target_url} 🔗</a>
                                 ${site.db_host ? `
                                     <div style="font-size: 0.75rem; color: #64748B; margin-top: 0.5rem; display: flex; gap: 1rem;">
                                         <span>🗄️ DB: ${site.db_host}</span>

@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm";
-import type { Site } from "./Site.js";
+import type { SiteMember } from "./SiteMember.js";
 
 @Entity("users")
 export class User {
@@ -18,14 +18,22 @@ export class User {
     @Column({ nullable: true })
     phone?: string;
 
-    @Column({ default: "user" }) // "admin" or "user"
-    role!: string;
+    @Column({ default: "user" })
+    role!: string; // Legacy: "admin" or "user" (kept for backward compatibility)
 
-    @Column({ default: "free" }) // "free", "basic", "pro", "enterprise"
-    subscription_type!: string;
+    @Column({ default: "user" })
+    system_role!: string; // "superadmin" | "user"
 
+    @Column({ default: "free" })
+    subscription_type!: string; // "free", "basic", "pro", "enterprise"
+
+    // Legacy relationship (backward compatibility)
     @OneToMany("Site", "user")
-    sites!: Site[];
+    sites!: any[];
+
+    // New multi-tenant relationship
+    @OneToMany("SiteMember", "user")
+    siteMembers!: SiteMember[];
 
     @CreateDateColumn()
     created_at!: Date;

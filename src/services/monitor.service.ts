@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export class MonitorService {
+
     /**
      * Performs a health check on the target URL.
      */
@@ -22,6 +23,8 @@ export class MonitorService {
             };
         }
     }
+
+
 
     /**
      * Triggers self-healing via SSH or local agent.

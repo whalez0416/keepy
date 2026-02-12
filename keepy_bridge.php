@@ -1,340 +1,331 @@
 <?php
 /**
- * Keepy DB Bridge - 민병원 전용
- * 
- * 이 파일을 민병원 서버의 루트 디렉토리에 업로드하세요.
- * 예: https://minhospital.co.kr/keepy_bridge.php
- * 
- * 보안: 사용 후 반드시 삭제하거나 접근 제한을 설정하세요!
+ * Keepy Universal DB Bridge
+ * Version: 1.1.1 (Hospital v1 Edition)
  */
 
+error_reporting(0);
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *'); // CORS 허용
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-API-KEY');
 
-// OPTIONS 요청 처리 (CORS preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// 보안: API 키 검증 (선택사항)
-$API_KEY = 'keepy_secret_2024'; // 나중에 변경하세요
+// Config
+$API_KEY = 'keepy_secret_2024';
+$VERSION = '1.2.0';
+$ALLOW_DEBUG = false; 
+
+$execution_trace = [];
+
+function log_trace($step, $msg) {
+    global $execution_trace;
+    $execution_trace[] = "[".date('H:i:s')."] $step: $msg";
+}
+
+/**
+ * Filter trace for success responses (Summarization)
+ */
+function get_success_trace() {
+    global $execution_trace;
+    $summary = [];
+    $seen = [];
+    foreach ($execution_trace as $line) {
+        if (preg_match('/(CONNECT|DISCOVERY|MAPPING|BOARDS|Fetch)/i', $line, $matches)) {
+            $key = strtoupper($matches[1]);
+            if (!isset($seen[$key])) {
+                $summary[] = $line;
+                $seen[$key] = true;
+            }
+        }
+    }
+    return $summary;
+}
+
+// Security Check
 if (isset($_SERVER['HTTP_X_API_KEY']) && $_SERVER['HTTP_X_API_KEY'] !== $API_KEY) {
     http_response_code(403);
-    echo json_encode(['error' => 'Invalid API key']);
+    echo json_encode(['success' => false, 'error' => 'Invalid API key', 'trace' => $execution_trace]);
     exit;
 }
 
-// DB 접속 정보 (민병원 실제 정보)
-$DB_HOST = 'localhost';
-$DB_USER = 'minhospital2008';
-$DB_PASS = 'minho3114*';
-$DB_NAME = 'minhospital2008';
+$input = json_decode(file_get_contents('php://input'), true);
+$action = $input['action'] ?? ($_GET['action'] ?? 'status');
 
-try {
-    $pdo = new PDO(
-        "mysql:host=$DB_HOST;dbname=$DB_NAME;charset=utf8mb4",
-        $DB_USER,
-        $DB_PASS,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-        ]
-    );
+// Step 1: Baseline Status (No DB Access)
+if ($action === 'status') {
+    echo json_encode([
+        'status' => 'ok',
+        'service' => 'Keepy Universal Bridge',
+        'version' => $VERSION,
+        'capabilities' => ['list_boards', 'fetch_posts', 'debug_spam_check']
+    ]);
+    exit;
+}
 
-    // POST 요청 처리
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $action = $input['action'] ?? '';
-
-        switch ($action) {
-            case 'test_connection':
-                // DB 연결 테스트
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'DB 연결 성공',
-                    'database' => $DB_NAME
-                ]);
-                break;
-
-            case 'scan_spam':
-                // 스팸 게시글 검색
-                $keywords = $input['keywords'] ?? ['카지노', '바다이야기', '도박'];
-                $table = $input['table'] ?? 'g5_write_free';
+/**
+ * DB Configuration Auto-Discovery
+ */
+function discover_db_config() {
+    log_trace('DB_DISCOVERY', 'Starting auto-discovery...');
+    $root = $_SERVER['DOCUMENT_ROOT'];
+    
+    $configs = [
+        ['path' => 'data/dbconfig.php', 'type' => 'gnuboard5'],
+        ['path' => '../data/dbconfig.php', 'type' => 'gnuboard5'],
+        ['path' => 'wp-config.php', 'type' => 'wordpress'],
+        ['path' => '../wp-config.php', 'type' => 'wordpress'],
+    ];
+    
+    foreach ($configs as $cfg) {
+        $fullPath = $root . DIRECTORY_SEPARATOR . $cfg['path'];
+        if (file_exists($fullPath)) {
+            $content = file_get_contents($fullPath);
+            log_trace('DB_DISCOVERY', "Found config at: {$cfg['path']} ({$cfg['type']})");
+            
+            if ($cfg['type'] === 'gnuboard5') {
+                preg_match("/G5_MYSQL_HOST', '(.+)'/", $content, $host);
+                preg_match("/G5_MYSQL_USER', '(.+)'/", $content, $user);
+                preg_match("/G5_MYSQL_PASSWORD', '(.+)'/", $content, $pass);
+                preg_match("/G5_MYSQL_DB', '(.+)'/", $content, $db);
                 
-                // 테이블 존재 확인
-                $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
-                if ($stmt->rowCount() === 0) {
-                    echo json_encode([
-                        'success' => false,
-                        'error' => "테이블 '$table'이 존재하지 않습니다"
-                    ]);
-                    break;
+                if (!empty($host[1])) {
+                    return [
+                        'host' => $host[1], 'user' => $user[1], 'pass' => $pass[1], 'name' => $db[1], 'cms' => $cfg['type']
+                    ];
                 }
-
-                // 스팸 검색 쿼리 생성
-                $conditions = [];
-                foreach ($keywords as $keyword) {
-                    $conditions[] = "wr_content LIKE :keyword_" . count($conditions);
-                }
-                $where = implode(' OR ', $conditions);
-                
-                $sql = "SELECT COUNT(*) as count FROM $table WHERE $where";
-                $stmt = $pdo->prepare($sql);
-                
-                foreach ($keywords as $index => $keyword) {
-                    $stmt->bindValue(":keyword_$index", "%$keyword%");
-                }
-                
-                $stmt->execute();
-                $result = $stmt->fetch();
-                
-                echo json_encode([
-                    'success' => true,
-                    'detected' => (int)$result['count'],
-                    'table' => $table,
-                    'keywords' => $keywords
-                ]);
-                break;
-
-            case 'fetch_recent_posts':
-                // 최근 게시물 가져오기 (고급 스팸 분석용)
-                $table = $input['table'] ?? 'g5_write_free';
-                $limit = $input['limit'] ?? 20;
-                
-                // 테이블 존재 확인
-                $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
-                if ($stmt->rowCount() === 0) {
-                    echo json_encode([
-                        'success' => false,
-                        'error' => "테이블 '$table'이 존재하지 않습니다"
-                    ]);
-                    break;
-                }
-                
-                // 최근 게시물 조회 (제목, 내용, 작성자, 전화번호 포함)
-                $sql = "SELECT 
-                    wr_id, 
-                    wr_subject, 
-                    wr_content,
-                    wr_name,
-                    wr_hp,
-                    wr_datetime
-                FROM $table 
-                ORDER BY wr_datetime DESC 
-                LIMIT :limit";
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-                $stmt->execute();
-                
-                $posts = $stmt->fetchAll();
-                
-                echo json_encode([
-                    'success' => true,
-                    'posts' => $posts,
-                    'count' => count($posts),
-                    'table' => $table
-                ]);
-                break;
-
-            case 'delete_spam':
-                // 스팸 게시글 삭제 (주의!)
-                $keywords = $input['keywords'] ?? ['카지노', '바다이야기'];
-                $table = $input['table'] ?? 'g5_write_free';
-                
-                // 안전 장치: 실제 삭제는 주석 처리
-                // 테스트 후 활성화하세요
-                /*
-                $conditions = [];
-                foreach ($keywords as $keyword) {
-                    $conditions[] = "wr_content LIKE :keyword_" . count($conditions);
-                }
-                $where = implode(' OR ', $conditions);
-                
-                $sql = "DELETE FROM $table WHERE $where";
-                $stmt = $pdo->prepare($sql);
-                
-                foreach ($keywords as $index => $keyword) {
-                    $stmt->bindValue(":keyword_$index", "%$keyword%");
-                }
-                
-                $stmt->execute();
-                $deleted = $stmt->rowCount();
-                */
-                
-                echo json_encode([
-                    'success' => true,
-                    'deleted' => 0,
-                    'message' => '삭제 기능은 안전을 위해 비활성화되어 있습니다'
-                ]);
-                break;
-
-            case 'create_test_post':
-                // 테스트 글 생성 (온라인 상담 게시판)
-                $table = $input['table'] ?? 'g5_write_online';
-                $subject = $input['subject'] ?? 'Keepy 시스템 테스트';
-                $content = $input['content'] ?? 'Keepy 모니터링 시스템 정상 작동 확인 중입니다.';
-                $name = $input['name'] ?? 'Keepy';
-                
-                // 테이블 존재 확인
-                $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
-                if ($stmt->rowCount() === 0) {
-                    echo json_encode([
-                        'success' => false,
-                        'error' => "테이블 '$table'이 존재하지 않습니다"
-                    ]);
-                    break;
-                }
-                
-                // 테이블 구조 확인 (필수 컬럼)
-                $stmt = $pdo->query("DESCRIBE $table");
-                $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                
-                // 기본 INSERT 쿼리
-                $sql = "INSERT INTO $table (
-                    wr_subject, 
-                    wr_content, 
-                    wr_name,
-                    wr_datetime,
-                    wr_ip,
-                    wr_option
-                ) VALUES (
-                    :subject,
-                    :content,
-                    :name,
-                    NOW(),
-                    :ip,
-                    'html1'
-                )";
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->bindValue(':subject', $subject);
-                $stmt->bindValue(':content', $content);
-                $stmt->bindValue(':name', $name);
-                $stmt->bindValue(':ip', $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
-                
-                $stmt->execute();
-                $postId = $pdo->lastInsertId();
-                
-                echo json_encode([
-                    'success' => true,
-                    'post_id' => $postId,
-                    'table' => $table,
-                    'message' => '테스트 글이 생성되었습니다'
-                ]);
-                break;
-
-            case 'delete_post':
-                // 특정 글 삭제
-                $table = $input['table'] ?? 'g5_write_online';
-                $postId = $input['post_id'] ?? null;
-                
-                if (!$postId) {
-                    echo json_encode([
-                        'success' => false,
-                        'error' => 'post_id가 필요합니다'
-                    ]);
-                    break;
-                }
-                
-                // 테이블 존재 확인
-                $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
-                if ($stmt->rowCount() === 0) {
-                    echo json_encode([
-                        'success' => false,
-                        'error' => "테이블 '$table'이 존재하지 않습니다"
-                    ]);
-                    break;
-                }
-                
-                // 글 삭제
-                $sql = "DELETE FROM $table WHERE wr_id = :post_id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->bindValue(':post_id', $postId);
-                $stmt->execute();
-                
-                $deleted = $stmt->rowCount();
-                
-                echo json_encode([
-                    'success' => true,
-                    'deleted' => $deleted,
-                    'post_id' => $postId,
-                    'message' => $deleted > 0 ? '글이 삭제되었습니다' : '삭제할 글을 찾을 수 없습니다'
-                ]);
-                break;
-
-            case 'delete_test_posts':
-                // Keepy 테스트 글 일괄 삭제 (여러 테이블 검색)
-                $keywords = $input['keywords'] ?? ['Keepy', 'keepy', 'KEEPY', '시스템 테스트'];
-                $tables = $input['tables'] ?? ['g5_write_online', 'g5_write_counsel', 'g5_write_101', 'g5_write_free', 'g5_write_qa'];
-                $totalDeleted = 0;
-                
-                foreach ($tables as $table) {
-                    // 테이블 존재 확인
-                    $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
-                    if ($stmt->rowCount() === 0) continue;
-
-                    // 조건 생성
-                    $conditions = [];
-                    foreach ($keywords as $index => $keyword) {
-                        $conditions[] = "wr_subject LIKE :keyword_" . $table . "_" . $index;
-                    }
-                    $where = implode(' OR ', $conditions);
-                    
-                    $sql = "DELETE FROM $table WHERE $where";
-                    $stmt = $pdo->prepare($sql);
-                    
-                    foreach ($keywords as $index => $keyword) {
-                        $stmt->bindValue(":keyword_" . $table . "_" . $index, "%$keyword%");
-                    }
-                    
-                    $stmt->execute();
-                    $totalDeleted += $stmt->rowCount();
-                }
-                
-                echo json_encode([
-                    'success' => true,
-                    'deleted' => $totalDeleted,
-                    'message' => "총 $totalDeleted 개의 테스트 글을 삭제했습니다."
-                ]);
-                break;
-
-            case 'list_tables':
-                // 게시판 테이블 목록 조회
-                $stmt = $pdo->query("SHOW TABLES LIKE 'g5_write_%'");
-                $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                
-                echo json_encode([
-                    'success' => true,
-                    'tables' => $tables,
-                    'count' => count($tables)
-                ]);
-                break;
-
-            default:
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'Unknown action'
-                ]);
+            }
         }
-    } else {
-        // GET 요청: 상태 확인
-        echo json_encode([
-            'status' => 'ok',
-            'service' => 'Keepy DB Bridge',
-            'database' => $DB_NAME,
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
     }
 
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'DB 연결 실패: ' . $e->getMessage()
-    ]);
+    log_trace('DB_DISCOVERY', 'No CMS config found. Using manual fallback.');
+    return [
+        'host' => 'localhost', 'user' => 'minhospital2008', 'pass' => 'minho3114*', 'name' => 'minhospital2008', 'cms' => 'manual'
+    ];
 }
-?>
+
+try {
+    $dbConfig = discover_db_config();
+    $pdo = new PDO(
+        "mysql:host={$dbConfig['host']};dbname={$dbConfig['name']};charset=utf8mb4",
+        $dbConfig['user'], $dbConfig['pass'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+    );
+    log_trace('DB_CONNECT', "Connected to: {$dbConfig['name']}");
+
+    switch ($action) {
+        case 'test_connection':
+            echo json_encode(['success' => true, 'cms' => $dbConfig['cms'], 'database' => $dbConfig['name'], 'trace' => get_success_trace()]);
+            break;
+
+        case 'list_boards':
+            log_trace('LIST_BOARDS', 'Fetching board table candidates...');
+            $stmt = $pdo->query("SHOW TABLES");
+            $allTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $boards = [];
+            
+            $keywords = ['write_', 'board', 'post', 'consult', 'reserve', 'qna', 'manage'];
+            log_trace('LIST_BOARDS', "Checking " . count($allTables) . " tables...");
+
+            foreach ($allTables as $t) {
+                $matched = false;
+                foreach ($keywords as $kw) {
+                    if (stripos($t, $kw) !== false) {
+                        $matched = true;
+                        break;
+                    }
+                }
+
+                if ($matched) {
+                    try {
+                        $cnt = (int)$pdo->query("SELECT COUNT(*) FROM `$t`")->fetchColumn();
+                        
+                        // Try to find a date column for last_activity
+                        $last = null;
+                        $dateCols = ['wr_datetime', 'reg_dt', 'created_at', 'post_date', 'date', 'RegDate', 'Reg_Dt', 'RegisteredDate'];
+                        
+                        // Check columns first to avoid PDO exceptions in a loop
+                        $stmtCol = $pdo->query("DESCRIBE `$t` ");
+                        $cols = array_column($stmtCol->fetchAll(), 'Field');
+                        
+                        foreach ($dateCols as $dc) {
+                            if (in_array($dc, $cols)) {
+                                $last = $pdo->query("SELECT MAX(`$dc`) FROM `$t`")->fetchColumn();
+                                break;
+                            }
+                        }
+
+                        $boards[] = [
+                            'table' => $t,
+                            'count' => $cnt,
+                            'last_activity' => $last
+                        ];
+                    } catch (Exception $e) {
+                        log_trace('LIST_BOARDS_ERR', "Error checking $t: " . $e->getMessage());
+                    }
+                }
+            }
+            log_trace('LIST_BOARDS', "Found " . count($boards) . " candidates.");
+            echo json_encode(['success' => true, 'boards' => $boards, 'trace' => get_success_trace()]);
+            break;
+
+        case 'fetch_recent_posts':
+            $table = $input['table'] ?? '';
+            $limit = isset($input['limit']) ? (int)$input['limit'] : 10;
+            $sinceId = $input['last_id'] ?? 0;
+            $sinceDate = $input['since_date'] ?? null;
+            
+            if (empty($table) || !preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+                echo json_encode(['success' => false, 'error' => 'Invalid table', 'trace' => $execution_trace]);
+                break;
+            }
+
+            // Adaptive Column Mapping
+            $stmt = $pdo->query("DESCRIBE `$table` ");
+            $cols = array_column($stmt->fetchAll(), 'Field');
+            
+            $idCol = $cols[0]; // Fallback to first col
+            $subCol = $cols[min(1, count($cols)-1)];
+            $contCol = $cols[min(2, count($cols)-1)];
+            $dateCol = $cols[min(3, count($cols)-1)];
+
+            $idC = ['wr_id', 'id', 'idx', 'seq', 'no', 'board_idx'];
+            $subC = ['wr_subject', 'subject', 'title', 'post_title', 'name'];
+            $contC = ['wr_content', 'content', 'post_content', 'memo', 'comment'];
+            $dateC = ['wr_datetime', 'reg_dt', 'created_at', 'post_date', 'date', 'regdate', 'reg_dt', 'registereddate'];
+
+            foreach($cols as $c) {
+                $lc = strtolower($c);
+                if(in_array($lc, $idC)) $idCol = $c;
+                if(in_array($lc, $subC)) $subCol = $c;
+                if(in_array($lc, $contC)) $contCol = $c;
+                if(in_array($lc, $dateC)) $dateCol = $c;
+            }
+            log_trace('COLUMN_MAPPING', "Mapped: ID($idCol), Sub($subCol), Date($dateCol)");
+
+            // Composite Smart Scan Logic
+            $where = "`$idCol` > :since";
+            $params = [':since' => $sinceId];
+
+            if ($sinceDate) {
+                // If date is provided, scan posts newer than either ID OR Date (Safety Margin)
+                $where = "(`$idCol` > :since OR `$dateCol` > :sdate)";
+                $params[':sdate'] = $sinceDate;
+            }
+
+            $sql = "SELECT `$idCol` as id, `$subCol` as subject, `$contCol` as content, `$dateCol` as date 
+                    FROM `$table` WHERE $where ORDER BY `$idCol` ASC LIMIT :limit";
+            
+            $stmt = $pdo->prepare($sql);
+            foreach($params as $k => $v) $stmt->bindValue($k, $v);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            echo json_encode([
+                'success' => true, 
+                'posts' => $stmt->fetchAll(), 
+                'trace' => get_success_trace(),
+                'mapping' => ['id' => $idCol, 'subject' => $subCol, 'content' => $contCol, 'date' => $dateCol]
+            ]);
+            break;
+
+        case 'debug_spam_check':
+            if (!$ALLOW_DEBUG) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Debug mode disabled']);
+                break;
+            }
+            $table = $input['table'] ?? '';
+            $pid = $input['post_id'] ?? '';
+            log_trace('DEBUG_MODE', "Inspecting Post ID: $pid in $table");
+            
+            // Re-run mapping logic to return metadata
+            $stmt = $pdo->query("DESCRIBE `$table` ");
+            $cols = array_column($stmt->fetchAll(), 'Field');
+            
+            // Dynamic WHERE to avoid PDO 500 errors on missing columns
+            $whereParts = [];
+            if (in_array('wr_id', $cols)) $whereParts[] = "wr_id = :id";
+            if (in_array('id', $cols)) $whereParts[] = "id = :id";
+            if (in_array('seq', $cols)) $whereParts[] = "seq = :id";
+            
+            if (empty($whereParts)) {
+                $where = $cols[0] . " = :id"; // Fallback to first col
+            } else {
+                $where = implode(" OR ", $whereParts);
+            }
+
+            $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE $where LIMIT 1");
+            $stmt->execute([':id' => $pid]);
+            echo json_encode(['success' => true, 'raw_data' => $stmt->fetch(), 'columns' => $cols, 'trace' => $execution_trace]);
+            break;
+
+        case 'delete_post':
+            $table = $input['table'] ?? '';
+            $pid = $input['post_id'] ?? '';
+            
+            if (empty($table) || empty($pid)) {
+                echo json_encode(['success' => false, 'error' => 'Missing table or post_id', 'trace' => $execution_trace]);
+                break;
+            }
+
+            log_trace('DELETE_POST', "Request to delete ID $pid from $table");
+
+            // Whitelist Check: Only board-like tables allowed
+            $is_whitelisted = false;
+            $keywords = ['write_', 'board', 'post', 'consult', 'reserve', 'qna', 'manage'];
+            foreach ($keywords as $kw) {
+                if (stripos($table, $kw) !== false) {
+                    $is_whitelisted = true;
+                    break;
+                }
+            }
+
+            if (!$is_whitelisted) {
+                log_trace('DELETE_POST', "FORBIDDEN_TABLE: $table");
+                echo json_encode(['success' => false, 'error' => 'FORBIDDEN_TABLE', 'trace' => $execution_trace]);
+                break;
+            }
+
+            // Map ID column
+            $stmt = $pdo->query("DESCRIBE `$table` ");
+            $cols = array_column($stmt->fetchAll(), 'Field');
+            $idCol = $cols[0];
+            $idC = ['wr_id', 'id', 'idx', 'seq', 'no', 'board_idx'];
+            foreach($cols as $c) {
+                if(in_array(strtolower($c), $idC)) {
+                    $idCol = $c;
+                    break;
+                }
+            }
+
+            // Check if exists first
+            $check = $pdo->prepare("SELECT COUNT(*) FROM `$table` WHERE `$idCol` = :id");
+            $check->execute([':id' => $pid]);
+            if ((int)$check->fetchColumn() === 0) {
+                log_trace('DELETE_POST', "NOT_FOUND: $pid in $table");
+                echo json_encode(['success' => false, 'error' => 'NOT_FOUND', 'trace' => $execution_trace]);
+                break;
+            }
+
+            // Execute Delete
+            $stmt = $pdo->prepare("DELETE FROM `$table` WHERE `$idCol` = :id");
+            $stmt->execute([':id' => $pid]);
+            
+            log_trace('DELETE_POST', "Successfully deleted ID $pid");
+            echo json_encode(['success' => true, 'trace' => get_success_trace()]);
+            break;
+
+        default:
+            echo json_encode(['success' => false, 'error' => 'Unknown action', 'trace' => $execution_trace]);
+            break;
+    }
+
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $execution_trace]);
+}

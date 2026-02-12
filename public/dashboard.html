@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepy - 병의원 통합 관리 대시보드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2C64F8;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #1E293B;
+            --text-sub: #64748B;
+            --success: #10B981;
+            --danger: #EF4444;
+            --accent: #F59E0B;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Pretendard', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 260px;
+            background: #0F172A;
+            color: white;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+            color: var(--primary);
+        }
+
+        nav ul {
+            list-style: none;
+        }
+
+        nav li {
+            padding: 1rem 0;
+            color: #94A3B8;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        nav li.active {
+            color: white;
+            font-weight: 600;
+        }
+
+        nav li:hover {
+            color: white;
+        }
+
+        .admin-only {
+            display: none;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            padding: 2rem 3rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Main Monitoring Card */
+        .monitor-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .site-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--success);
+            margin-bottom: 1rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .control-item h3 {
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #CBD5E1;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1.5rem;
+            width: 100%;
+        }
+
+        .price-tag {
+            background: #F1F5F9;
+            padding: 1.5rem;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        .price-value {
+            color: var(--primary);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+    <aside>
+        <div class="logo">Keepy</div>
+        <nav>
+            <ul>
+                <li onclick="switchTab('dashboard', this)" class="active">대시보드</li>
+                <li onclick="switchTab('logs', this)">모니터링 로그</li>
+                <li onclick="switchTab('spam-logs', this)">🔔 스팸 감지 내역</li>
+                <li onclick="switchTab('settings', this)">모니터링 설정</li>
+                <li onclick="switchTab('billing', this)">결제 내역</li>
+                <li onclick="switchTab('profile', this)">내 정보 수정</li>
+                <li onclick="switchTab('support', this)">고객센터</li>
+                <li onclick="switchTab('security-guide', this)">보안 기능 안내</li>
+                <li id="adminMenuItem" class="admin-only" onclick="window.location.href='/admin'"
+                    style="border-top: 1px solid #334155; margin-top: 1rem; padding-top: 1.5rem;">🛡️ 관리자 페이지</li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main>
+        <header>
+            <h1 id="pageTitle">관리 대시보드</h1>
+            <div class="user-info">
+                <div style="text-align: right; margin-right: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;">
+                        <span id="userNameLabel" style="font-weight: 600;">민병원 원장님</span>
+                        <div id="userRoleBadge"
+                            style="padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: #334155; color: white;">
+                            User</div>
+                    </div>
+                    <div onclick="logout()"
+                        style="font-size: 0.75rem; color: var(--text-sub); cursor: pointer; margin-top: 2px; text-decoration: underline;">
+                        로그아웃</div>
+                </div>
+                <div style="width: 40px; height: 40px; background: #E2E8F0; border-radius: 50%;"></div>
+            </div>
+        </header>
+
+        <div id="section-dashboard" class="content-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">오늘 삭제된 스팸</div>
+                    <div class="stat-value" id="spamCount">24개</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">자동 복구 횟수</div>
+                    <div class="stat-value" id="recoveryCount">1회</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">업타임 (24h)</div>
+                    <div class="stat-value" id="uptimeValue">99.9%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">이번 달 예상 요금</div>
+                    <div class="stat-value" id="estPrice">19,800원</div>
+                </div>
+            </div>
+
+            <!-- DB Connection / Registration Card (Shown if no sites, or manually toggleable) -->
+            <div class="monitor-card" id="registerCard"
+                style="display: none; margin-bottom: 2rem; border: 1px solid var(--primary);">
+                <h2 style="margin-bottom: 1rem; color: var(--primary);">🏥 민병원 DB 연결 (초기 설정)</h2>
+                <div class="db-credentials"
+                    style="background: #F1F5F9; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <strong>자동 감지된 설정:</strong><br>
+                    Host: localhost | User: minhospital2008 | DB: minhospital2008
+                </div>
+                <button class="btn-primary" onclick="registerMinHospital()">DB 연결 및 모니터링 시작</button>
+                <div id="registerResult" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="monitor-card" id="statusCard">
+                <div class="site-status">
+                    <div class="status-dot"></div>
+                    <span>민병원 홈페이지 정상 작동 중</span>
+                </div>
+                <p style="color: var(--text-sub);" id="lastChecked">최근 점검: 32초 전 (<a href="https://minhospital.co.kr"
+                        target="_blank" style="color: var(--primary); text-decoration: none;">https://minhospital.co.kr
+                        🔗</a>)</p>
+
+                <div class="control-panel">
+                    <div class="control-item">
+                        <h3>가변 모니터링 주기 설정</h3>
+                        <select id="intervalSelect" onchange="updatePrice()">
+                            <option value="1">1분 (가장 안전 / 29,800원)</option>
+                            <option value="3" selected>3분 (추천 / 19,800원)</option>
+                            <option value="5">5분 (보통 / 9,900원)</option>
+                        </select>
+                        <div class="price-tag">
+                            <span>월 예상 청구 금액</span>
+                            <span class="price-value" id="priceDisplay">19,800원</span>
+                        </div>
+                    </div>
+
+                    <div class="control-item">
+                        <h3>셀프 힐링 (서버 자가 복구)</h3>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                            <input type="checkbox" checked style="width: auto;">
+                            장애 감지 시 서버 자동 재시작 활성화
+                        </label>
+                        <div style="display: flex; gap: 10px; width: 100%;">
+                            <button class="btn-primary" onclick="alert('설정이 저장되었습니다.')" style="flex: 1;">설정 저장</button>
+                            <button class="btn-primary" onclick="triggerManualScan()"
+                                style="background: var(--text-main); flex: 1;">즉시 검사</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Section (New) -->
+        <div id="section-logs" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>최근 모니터링 로그 (실시간)</h2>
+                    <button class="btn-primary"
+                        style="width: auto; margin-top: 0; padding: 0.5rem 1rem; font-size: 0.9rem;"
+                        onclick="fetchAndDisplayLogs()">🔄 새로고침</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                        <thead>
+                            <tr style="background: #F8FAFC; border-bottom: 2px solid #E2E8F0; text-align: left;">
+                                <th style="padding: 12px; color: var(--text-sub);">시간</th>
+                                <th style="padding: 12px; color: var(--text-sub);">사이트</th>
+                                <th style="padding: 12px; color: var(--text-sub);">상태</th>
+                                <th style="padding: 12px; color: var(--text-sub);">메시지</th>
+                                <th style="padding: 12px; color: var(--text-sub);">응답 시간</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <tr>
+                                <td colspan="5" style="padding: 20px; text-align: center; color: var(--text-sub);">로딩
+                                    중...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spam History Section (v1.5) -->
+        <div id="section-spam-logs" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>🛡️ 스팸 감지 내역 (최근 7일)</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div id="adminSiteSelector" style="display: none;">
+                            <select id="siteFilter" onchange="fetchAndDisplaySpamLogs()"
+                                style="padding: 0.5rem; border-radius: 6px; font-size: 0.9rem;">
+                                <option value="">전체 사이트</option>
+                            </select>
+                        </div>
+                        <button class="btn-primary"
+                            style="width: auto; margin-top: 0; padding: 0.5rem 1rem; font-size: 0.9rem;"
+                            onclick="fetchAndDisplaySpamLogs()">🔄 새로고침</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #F8FAFC; border-bottom: 2px solid #E2E8F0; text-align: left;">
+                                <th style="padding: 12px; color: var(--text-sub);">탐지 시각</th>
+                                <th style="padding: 12px; color: var(--text-sub);">사이트/게시판</th>
+                                <th style="padding: 12px; color: var(--text-sub);">제목 (마스킹)</th>
+                                <th style="padding: 12px; color: var(--text-sub);">사유</th>
+                                <th style="padding: 12px; color: var(--text-sub);">점수</th>
+                                <th style="padding: 12px; color: var(--text-sub);">상태</th>
+                                <th id="thAction" style="padding: 12px; color: var(--text-sub);">액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="spamLogsTableBody">
+                            <tr>
+                                <td colspan="7" style="padding: 20px; text-align: center; color: var(--text-sub);">로딩
+                                    중...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="section-settings" class="content-section" style="display: none;">
+            <!-- ... settings ... -->
+            <div class="monitor-card">
+                <h2>알림 설정</h2>
+                <!-- ... -->
+                <button class="btn-primary" onclick="alert('알림 설정이 저장되었습니다.')" style="width: 200px;">저장</button>
+            </div>
+        </div>
+        <!-- (omitted other sections for brevity in replacement, but kept in replace tool logic if I could, but wait replace tool replaces chunks) -->
+        <!-- Since I need to replace a large chunk, I'll stick to the dashboard section primarily. -->
+        <!-- Actually, I need to be careful not to delete other sections if I select too much. -->
+        <!-- I will replace just the section-dashboard content and then append the JS function. -->
+        <!-- Wait, I can't append easily. I'll replace the dashboard section and the start of script maybe? No, that's messy. -->
+        <!-- I will use two replace calls. One for HTML, one for JS. -->
+
+        <!-- REVISING PLAN: I will do this in 2 calls. Call 1: HTML update. Call 2: JS addition. -->
+        <!-- This tool call will ONLY update the HTML part. -->
+
+
+        <!-- Settings Section -->
+        <div id="section-settings" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>알림 설정</h2>
+                <div style="margin-top: 20px;">
+                    <label
+                        style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; justify-content: flex-start;">
+                        <input type="checkbox" checked style="width: auto; margin: 0;"> 장애 발생 시 문자 알림 (010-****-1234)
+                    </label>
+                    <label
+                        style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; justify-content: flex-start;">
+                        <input type="checkbox" checked style="width: auto; margin: 0;"> 스팸 자동 삭제 내역 주간 리포트 받기
+                    </label>
+                </div>
+
+                <h2 style="margin-top: 30px;">집중 검사 설정</h2>
+                <div style="margin-top: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">집중 모니터링 게시판 (선택)</label>
+                    <input type="text" id="specificBoardTable" placeholder="예: g5_write_online (비워두면 전체 스캔)"
+                        style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 6px;">
+                    <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 5px;">
+                        * 특정 게시판만 집중적으로 검사하고 싶을 때 입력하세요.<br>
+                        * 비워두면 자동으로 찾은 모든 게시판을 검사합니다.
+                    </p>
+                </div>
+
+                <button class="btn-primary" onclick="saveSettings()" style="width: 200px; margin-top: 20px;">설정
+                    저장</button>
+            </div>
+        </div>
+
+        <!-- Billing Section -->
+        <div id="section-billing" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>이번 달 결제 예정 금액</h2>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--primary); margin: 20px 0;">19,800원</div>
+                <p style="color: var(--text-sub); margin-bottom: 30px;">결제일: 2026년 2월 25일</p>
+
+                <h3>결제 내역</h3>
+                <div style="margin-top: 15px; border-top: 1px solid #e2e8f0;">
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span>2026.01.25 정기결제</span>
+                        <span style="font-weight: 600;">19,800원</span>
+                    </div>
+                    <div
+                        style="display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                        <span>2025.12.25 정기결제</span>
+                        <span style="font-weight: 600;">19,800원</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div id="section-profile" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>내 정보 수정</h2>
+                <div style="margin-top: 2rem;">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">이메일 (변경 불가)</label>
+                        <input type="email" id="profileEmail" disabled
+                            style="background: #f1f5f9; cursor: not-allowed; opacity: 0.7;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">이름</label>
+                        <input type="text" id="profileName">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">전화번호</label>
+                        <input type="text" id="profilePhone">
+                    </div>
+                    <div style="margin-bottom: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">새 비밀번호 (변경시에만 입력)</label>
+                        <input type="password" id="profilePassword" placeholder="새 비밀번호">
+                    </div>
+                    <button class="btn-primary" onclick="updateProfile()">정보 저장하기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support Section -->
+        <div id="section-support" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2>1:1 문의하기</h2>
+                <p style="color: var(--text-sub); margin-bottom: 2rem;">궁금한 점이나 기술 지원이 필요하시면 언제든 문의해주세요.</p>
+                <input type="text" placeholder="문의 제목" style="margin-bottom: 10px;">
+                <textarea
+                    style="width: 100%; height: 200px; padding: 15px; border-radius: 8px; border: 1px solid #CBD5E1; resize: none;"
+                    placeholder="문의 내용을 입력해주세요."></textarea>
+                <button class="btn-primary" onclick="alert('문의가 접수되었습니다. 담당자가 곧 연락드리겠습니다.')">문의 접수하기</button>
+            </div>
+        </div>
+        <!-- Security Guide Section (New) -->
+        <div id="section-security-guide" class="content-section" style="display: none;">
+            <div class="monitor-card">
+                <h2 style="margin-bottom: 2rem;">🛡️ Keepy 보안 시스템 안내</h2>
+
+                <div style="display: grid; gap: 2rem;">
+                    <div
+                        style="background: #F8FAFC; padding: 1.5rem; border-radius: 12px; border-left: 5px solid var(--primary);">
+                        <h3 style="color: var(--primary); margin-bottom: 0.5rem;">1단계: 실시간 연결 감시 (Hearthbeat Check)</h3>
+                        <p style="color: var(--text-sub); line-height: 1.6;">
+                            사용자의 홈페이지가 정상적으로 열리는지 <strong>24시간 실시간</strong>으로 감시합니다.<br>
+                            단순히 페이지만 확인하는 것이 아니라, 실제로 데이터베이스가 응답하는지까지 체크합니다.
+                        </p>
+                    </div>
+
+                    <div
+                        style="background: #F8FAFC; padding: 1.5rem; border-radius: 12px; border-left: 5px solid var(--danger);">
+                        <h3 style="color: var(--danger); margin-bottom: 0.5rem;">2단계: 스팸 헌터 (Spam Hunter)</h3>
+                        <p style="color: var(--text-sub); line-height: 1.6;">
+                            게시판에 등록되는 <strong>악성 스팸(카지노, 도박 등)</strong>을 자동으로 탐지하고 즉시 삭제합니다.<br>
+                            특정 키워드뿐만 아니라 무작위 문자열(외계어)까지 분석하여 차단합니다.
+                        </p>
+                    </div>
+
+                    <div
+                        style="background: #F8FAFC; padding: 1.5rem; border-radius: 12px; border-left: 5px solid var(--success);">
+                        <h3 style="color: var(--success); margin-bottom: 0.5rem;">3단계: 셀프 힐링 (Self Healing)</h3>
+                        <p style="color: var(--text-sub); line-height: 1.6;">
+                            서버 장애나 DB 연결 끊김이 감지되면, 관리자가 개입하기 전에 <strong>자동으로 복구</strong>를 시도합니다.<br>
+                            (현재 단계에서는 연결 재시도 및 자동 알림 발송을 수행합니다.)
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+        </div>
+    </main>
+
+    <script>
+        // Check authentication on page load
+        const token = localStorage.getItem('keepy_token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Check if user is admin and show admin menu
+        const user = JSON.parse(localStorage.getItem('keepy_user') || '{}');
+        if (user.role === 'admin') {
+            document.getElementById('adminMenuItem').style.display = 'block';
+        }
+
+        // Initialize User Info
+        document.getElementById('userNameLabel').innerText = `${user.name} 님`;
+        document.getElementById('userRoleBadge').innerText = user.role === 'admin' ? 'Admin' : 'User';
+        document.getElementById('profileEmail').value = user.email || '';
+        document.getElementById('profileName').value = user.name || '';
+        document.getElementById('profilePhone').value = user.phone || '';
+
+        // Helper function to make authenticated requests
+        async function authFetch(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...options.headers
+            };
+
+            try {
+                const response = await fetch(url, { ...options, headers });
+
+                // v1.5: Unified 401 Interceptor for Auto-Logout
+                if (response.status === 401) {
+                    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+                    logout();
+                    return null;
+                }
+
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+        async function updateProfile() {
+            const name = document.getElementById('profileName').value;
+            const phone = document.getElementById('profilePhone').value;
+            const password = document.getElementById('profilePassword').value;
+
+            const response = await authFetch('http://localhost:3000/auth/profile', {
+                method: 'PATCH',
+                body: JSON.stringify({ name, phone, password: password || undefined })
+            });
+
+            if (!response) return;
+
+            const data = await response.json();
+            alert('정보가 수정되었습니다.');
+
+            // Update local storage and UI
+            const updatedUser = { ...user, name: data.user.name, phone: data.user.phone };
+            localStorage.setItem('keepy_user', JSON.stringify(updatedUser));
+            document.getElementById('userNameLabel').innerText = `${updatedUser.name} 님`;
+            document.getElementById('profilePassword').value = '';
+        }
+
+        function logout() {
+            localStorage.removeItem('keepy_token');
+            localStorage.removeItem('keepy_user');
+            window.location.href = '/login.html';
+        }
+
+        const priceMap = {
+            1: '29,800원',
+            3: '19,800원',
+            5: '9,900원'
+        };
+
+        function updatePrice() {
+            const interval = document.getElementById('intervalSelect').value;
+            document.getElementById('priceDisplay').innerText = priceMap[interval];
+        }
+
+        async function saveSettings() {
+            if (!window.currentSiteId) {
+                alert('등록된 사이트가 없습니다.');
+                return;
+            }
+
+            const specificBoard = document.getElementById('specificBoardTable').value;
+
+            try {
+                const response = await authFetch(`http://localhost:3000/sites/${window.currentSiteId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        specific_board_table: specificBoard
+                    })
+                });
+
+                if (response && response.ok) {
+                    alert('설정이 저장되었습니다.\n\n[집중 검사 게시판]이 적용되었습니다.\n즉시 검사를 실행하면 해당 게시판을 우선 검사합니다.');
+                } else {
+                    alert('설정 저장 실패');
+                }
+            } catch (error) {
+                console.error('Save failed:', error);
+                alert('오류가 발생했습니다.');
+            }
+        }
+
+        async function fetchDashboardData() {
+            try {
+                // 1. Fetch Sites (with auth)
+                const sitesRes = await authFetch('http://localhost:3000/sites');
+                if (!sitesRes) return;
+
+                const sites = await sitesRes.json();
+
+                if (sites.length > 0) {
+                    // Hide register, show status
+                    document.getElementById('registerCard').style.display = 'none';
+                    document.getElementById('statusCard').style.display = 'block';
+
+                    const site = sites[0]; // Primary site
+                    window.currentSiteId = site.id; // Store for updates
+
+                    // Set specific board input if exists
+                    if (site.specific_board_table) {
+                        const boardInput = document.getElementById('specificBoardTable');
+                        if (boardInput) boardInput.value = site.specific_board_table;
+                    }
+
+                    // Update Status
+                    const statusText = site.current_status === 'healthy' ? '정상 작동 중' : '장애 발생 확인';
+                    const statusColor = site.current_status === 'healthy' ? 'var(--success)' : 'var(--danger)';
+                    const statusDot = document.querySelector('.status-dot');
+                    const statusMsg = document.querySelector('.site-status span');
+
+                    if (statusDot) {
+                        statusDot.style.background = statusColor;
+                        statusDot.style.boxShadow = `0 0 10px ${statusColor}`;
+                    }
+                    if (statusMsg) {
+                        statusMsg.innerText = `${site.site_name} ${statusText}`;
+                        statusMsg.style.color = statusColor;
+                    }
+
+                    // Update Last Checked
+                    const lastChecked = document.getElementById('lastChecked');
+                    if (lastChecked) {
+                        lastChecked.innerHTML = `최근 점검: ${new Date().toLocaleTimeString()} (<a href="${site.target_url}" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">${site.target_url} 🔗</a>)`;
+                    }
+                } else {
+                    // No sites: Show register card, hide status
+                    document.getElementById('registerCard').style.display = 'block';
+                    document.getElementById('statusCard').style.display = 'none';
+                }
+
+                // 2. Fetch Logs (with auth)
+                const logsRes = await authFetch('http://localhost:3000/monitoring/logs');
+                if (!logsRes) return;
+
+                const logs = await logsRes.json();
+
+                // Update Uptime (Mock calculation based on logs for now)
+                const errorCount = logs.filter(l => l.status === 'error').length;
+                const uptime = errorCount === 0 ? '100%' : '99.9%';
+                document.getElementById('uptimeValue').innerText = uptime;
+
+            } catch (error) {
+                console.error('Failed to fetch dashboard data:', error);
+            }
+        }
+
+        async function fetchAndDisplayLogs() {
+            try {
+                const response = await authFetch('http://localhost:3000/monitoring/logs');
+                if (!response) return;
+
+                const logs = await response.json();
+                const tbody = document.getElementById('logsTableBody');
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--text-sub);">기록된 로그가 없습니다.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(log => {
+                    const statusColor = log.status === 'healthy' || log.status === 'up' ? 'var(--success)' : 'var(--danger)';
+                    const statusText = log.status.toUpperCase();
+                    const time = new Date(log.timestamp).toLocaleString();
+                    const responseTime = log.response_time ? `${log.response_time}ms` : '-';
+
+                    return `
+                        <tr style="border-bottom: 1px solid #E2E8F0;">
+                            <td style="padding: 12px;">${time}</td>
+                            <td style="padding: 12px; font-weight: 600;">${log.site_name || 'Site'}</td>
+                            <td style="padding: 12px;"><span style="color: ${statusColor}; font-weight: 600;">${statusText}</span></td>
+                            <td style="padding: 12px;">${log.message || '-'}</td>
+                            <td style="padding: 12px;">${responseTime}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+                document.getElementById('logsTableBody').innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--danger);">로그를 불러오는데 실패했습니다.</td></tr>';
+            }
+        }
+
+        async function registerMinHospital() {
+            const resultEl = document.getElementById('registerResult');
+            resultEl.innerHTML = '<div style="color: var(--primary);">등록 중...</div>';
+
+            try {
+                const response = await authFetch('http://localhost:3000/sites/register-db', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        host: 'localhost',
+                        user: 'minhospital2008',
+                        pass: 'minho3114*',
+                        name: 'minhospital2008',
+                        domain: 'minhospital.co.kr'
+                    })
+                });
+
+                if (!response) return;
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultEl.innerHTML = `<div style="color: var(--success); font-weight: 600;">✅ ${result.message}<br>상태: ${result.current_status}</div>`;
+                    // Refresh dash
+                    setTimeout(fetchDashboardData, 1000);
+                } else {
+                    resultEl.innerHTML = `<div style="color: var(--danger);">❌ ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultEl.innerHTML = `<div style="color: var(--danger);">❌ 등록 실패: ${error.message}</div>`;
+            }
+        }
+
+        // Initial Load & Polling
+        fetchDashboardData();
+
+        // v1.5: Role-based Initialization
+        if (user.role === 'admin') {
+            document.getElementById('adminSiteSelector').style.display = 'block';
+            fetchAdminSites();
+        }
+
+        async function fetchAdminSites() {
+            const res = await authFetch('http://localhost:3000/sites');
+            if (res && res.ok) {
+                const sites = await res.json();
+                const select = document.getElementById('siteFilter');
+                if (!select) return;
+                sites.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.site_name;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        setInterval(() => {
+            fetchDashboardData();
+            // Auto-refresh logs if tab is active
+            if (document.getElementById('section-logs').style.display !== 'none') {
+                fetchAndDisplayLogs();
+            } else if (document.getElementById('section-spam-logs').style.display !== 'none') {
+                fetchAndDisplaySpamLogs();
+            }
+        }, 5000); // Poll every 5 seconds (Avoid too frequent request)
+
+        async function fetchAndDisplaySpamLogs() {
+            try {
+                const siteId = document.getElementById('siteFilter').value;
+                const url = `http://localhost:3000/api/spam-logs?days=7${siteId ? `&site_id=${siteId}` : ''}`;
+                const response = await authFetch(url);
+                if (!response) return;
+
+                const data = await response.json();
+                const tbody = document.getElementById('spamLogsTableBody');
+                const isAdmin = user.role === 'admin';
+
+                if (data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="padding: 20px; text-align: center; color: var(--text-sub);">최근 7일간 탐지된 스팸이 없습니다.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.items.map(log => {
+                    const statusColors = {
+                        'detected': '#F59E0B',
+                        'deleted': '#10B981',
+                        'delete_failed': '#EF4444'
+                    };
+                    const date = new Date(log.detected_at).toLocaleString();
+                    const statusText = log.status === 'detected' ? '탐지됨' : (log.status === 'deleted' ? '삭제됨' : '삭제실패');
+
+                    const isAdmin = user.role === 'admin';
+                    const canDelete = isAdmin || log.can_user_delete_spam;
+
+                    return `
+                        <tr style="border-bottom: 1px solid #E2E8F0;">
+                            <td style="padding: 12px; font-size: 0.8rem;">${date}</td>
+                            <td style="padding: 12px;">
+                                <div style="font-weight: 600;">${log.site_name}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-sub);">${log.target_board_table}</div>
+                            </td>
+                            <td style="padding: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${log.subject}
+                            </td>
+                            <td style="padding: 12px; font-size: 0.75rem;">${(log.reasons || []).join(', ')}</td>
+                            <td style="padding: 12px; font-weight: 600;">${log.score}</td>
+                            <td style="padding: 12px;">
+                                <span style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background: ${statusColors[log.status]}22; color: ${statusColors[log.status]}; font-weight: 600;">
+                                    ${statusText}
+                                </span>
+                            </td>
+                            <td style="padding: 12px;">
+                                ${log.status !== 'deleted' ? (
+                            canDelete ?
+                                `<button onclick="deleteSpamPost('${log.log_id}')" style="padding: 4px 8px; font-size: 0.75rem; background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>` :
+                                `<button disabled title="삭제 권한이 없습니다" style="padding: 4px 8px; font-size: 0.75rem; background: #CBD5E1; color: white; border: none; border-radius: 4px; cursor: not-allowed; opacity: 0.7;">삭제 제한</button>`
+                        ) : '-'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Failed to fetch spam logs:', error);
+            }
+        }
+
+        async function deleteSpamPost(logId) {
+            if (!confirm('해당 게시물을 실제 홈페이지에서 삭제합니다. 되돌릴 수 없습니다. 진행하시겠습니까?')) return;
+
+            const res = await authFetch(`http://localhost:3000/api/spam-logs/${logId}/delete`, { method: 'POST' });
+            if (!res) return;
+
+            if (res.ok) {
+                alert('게시물이 성공적으로 삭제되었습니다.');
+                fetchAndDisplaySpamLogs();
+            } else {
+                const data = await res.json();
+                if (res.status === 409) {
+                    alert('이미 삭제된 게시물입니다.');
+                } else if (res.status === 403) {
+                    alert('삭제 권한이 없습니다 (NO_DELETE_PERMISSION).\n관리자에게 문의해주세요.');
+                } else {
+                    alert(`삭제 실패: ${data.error}`);
+                }
+                fetchAndDisplaySpamLogs();
+            }
+        }
+
+        function switchTab(tabId, element) {
+            // Update Title
+            const titles = {
+                'dashboard': '관리 대시보드',
+                'logs': '모니터링 로그 기록',
+                'spam-logs': '스팸 감지 내역 (최근 7일)',
+                'settings': '모니터링 설정',
+                'billing': '결제 내역',
+                'profile': '내 정보 수정',
+                'support': '고객센터',
+                'security-guide': '보안 기능 안내'
+            };
+            document.getElementById('pageTitle').innerText = titles[tabId];
+
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(el => el.style.display = 'none');
+
+            // Show selected section
+            document.getElementById('section-' + tabId).style.display = 'block';
+
+            // Update Menu Active State
+            document.querySelectorAll('nav li').forEach(li => li.classList.remove('active'));
+            element.classList.add('active');
+
+            // Load specific data if needed
+            if (tabId === 'logs') {
+                fetchAndDisplayLogs();
+            } else if (tabId === 'spam-logs') {
+                fetchAndDisplaySpamLogs();
+            }
+        }
+    </script>
+</body>
+
+</html>

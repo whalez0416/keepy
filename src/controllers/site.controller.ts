@@ -67,15 +67,7 @@ export class SiteController {
             registerSiteForMonitoring({
                 id: site.id,
                 site_name: site.site_name,
-                target_url: site.target_url,
-                monitoring_interval: site.monitoring_interval,
-                is_active: site.is_active,
-                current_status: site.current_status,
-                domain: domain, // ⭐ 도메인 추가
-                db_host: site.db_host,
-                db_user: site.db_user,
-                db_pass: site.db_pass,
-                db_name: site.db_name
+                domain: domain
             });
 
             res.status(200).json({

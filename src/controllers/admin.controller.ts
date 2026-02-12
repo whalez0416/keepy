@@ -3,7 +3,7 @@ import { AppDataSource } from "../config/database.js";
 import { User } from "../models/User.js";
 import { Site } from "../models/Site.js";
 import { AuthRequest } from "../middleware/auth.middleware.js";
-import { sites, monitoringLogs } from "./monitoring.scheduler.js";
+import { monitoringLogs } from "./monitoring.scheduler.js";
 
 export class AdminController {
     /**
@@ -12,6 +12,7 @@ export class AdminController {
     static async getAllUsers(req: AuthRequest, res: Response) {
         try {
             const userRepo = AppDataSource.getRepository(User);
+            const siteRepo = AppDataSource.getRepository(Site);
 
             const users = await userRepo.find({
                 select: ['id', 'email', 'name', 'phone', 'role', 'subscription_type', 'created_at'],
@@ -19,14 +20,18 @@ export class AdminController {
             });
 
             // Add site count for each user
-            const usersWithStats = users.map(user => {
-                const userSites = sites.filter(s => s.user_id === user.id);
+            // Optimization: Use a query builder or dedicated stats query in production
+            // For now, simple loop valid for low scale
+            const usersWithStats = await Promise.all(users.map(async user => {
+                const siteCount = await siteRepo.count({ where: { user: { id: user.id } } });
+                const activeCount = await siteRepo.count({ where: { user: { id: user.id }, is_active: true } });
+
                 return {
                     ...user,
-                    site_count: userSites.length,
-                    active_sites: userSites.filter(s => s.is_active).length
+                    site_count: siteCount,
+                    active_sites: activeCount
                 };
-            });
+            }));
 
             res.json({
                 users: usersWithStats,
@@ -45,6 +50,7 @@ export class AdminController {
         try {
             const { userId } = req.params;
             const userRepo = AppDataSource.getRepository(User);
+            const siteRepo = AppDataSource.getRepository(Site);
 
             const user = await userRepo.findOne({
                 where: { id: userId as string },
@@ -56,11 +62,12 @@ export class AdminController {
             }
 
             // Get user's sites
-            const userSites = sites.filter(s => s.user_id === userId);
+            const userSites = await siteRepo.find({ where: { user: { id: userId as string } } });
 
-            // Get user's recent logs
+            // Get user's recent logs (Still dependent on in-memory logs for now)
+            const userSiteIds = userSites.map(s => s.id);
             const userLogs = monitoringLogs
-                .filter(log => userSites.some(site => site.id === log.site_id))
+                .filter(log => userSiteIds.includes(log.site_id))
                 .slice(0, 20); // Last 20 logs
 
             res.json({
@@ -85,6 +92,7 @@ export class AdminController {
     static async getStats(req: AuthRequest, res: Response) {
         try {
             const userRepo = AppDataSource.getRepository(User);
+            const siteRepo = AppDataSource.getRepository(Site);
 
             const totalUsers = await userRepo.count();
             const adminUsers = await userRepo.count({ where: { role: 'admin' } });
@@ -94,6 +102,11 @@ export class AdminController {
             const basicUsers = await userRepo.count({ where: { subscription_type: 'basic' } });
             const proUsers = await userRepo.count({ where: { subscription_type: 'pro' } });
             const enterpriseUsers = await userRepo.count({ where: { subscription_type: 'enterprise' } });
+
+            // Site stats from DB
+            const totalSites = await siteRepo.count();
+            const activeSites = await siteRepo.count({ where: { is_active: true } });
+            const inactiveSites = totalSites - activeSites;
 
             res.json({
                 users: {
@@ -108,9 +121,9 @@ export class AdminController {
                     enterprise: enterpriseUsers
                 },
                 sites: {
-                    total: sites.length,
-                    active: sites.filter(s => s.is_active).length,
-                    inactive: sites.filter(s => !s.is_active).length
+                    total: totalSites,
+                    active: activeSites,
+                    inactive: inactiveSites
                 },
                 logs: {
                     total: monitoringLogs.length

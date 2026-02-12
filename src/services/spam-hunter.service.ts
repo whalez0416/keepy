@@ -1,121 +1,168 @@
 import axios from "axios";
+import { AppDataSource } from "../config/database.js";
+import { Site } from "../models/Site.js";
+import { MonitoringLog, MonitoringEventType } from "../models/MonitoringLog.js";
 
 interface SpamPost {
-    wr_id: number;
-    wr_subject: string;
-    wr_content: string;
-    wr_name?: string;
-    wr_hp?: string; // Phone number field
+    id: number | string;
+    subject: string;
+    content: string;
+    date: string;
+    hp?: string;
+}
+
+interface SpamJudgment {
+    isSpam: boolean;
+    reasons: string[];
+    score: number;
 }
 
 export class SpamHunterService {
     /**
      * Detects and deletes spam posts from customer's DB.
-     * Uses HTTP API bridge instead of direct MySQL connection.
+     * v1 Refinement: Windowed Scan + Standardized Reasoning + Event Logging
      */
-    async cleanSpam(siteConfig: any): Promise<{ detected: number; deleted: number }> {
-        console.log(`[SpamHunter] Connecting to DB via PHP Bridge: ${siteConfig.domain}`);
+    async cleanSpam(siteId: string): Promise<{ detected: number; message: string }> {
+        const siteRepo = AppDataSource.getRepository(Site);
+        const logRepo = AppDataSource.getRepository(MonitoringLog);
+
+        const site = await siteRepo.findOne({ where: { id: siteId } });
+        if (!site) throw new Error("Site not found");
+
+        console.log(`[SpamHunter] Starting scan for: ${site.domain}`);
 
         try {
-            // PHP 브릿지 URL 생성
-            const bridgeUrl = `https://${siteConfig.domain}/keepy_bridge.php`;
+            const bridgeUrl = `https://${site.domain}/keepy_bridge.php`;
+            const apiKey = "keepy_secret_2024";
 
-            console.log(`[SpamHunter] Bridge URL: ${bridgeUrl}`);
-
-            // 1. 연결 테스트
-            const testResponse = await axios.post(bridgeUrl, {
-                action: 'test_connection'
-            }, {
-                timeout: 10000,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+            // 1. Connection & Trace Check
+            const testResponse = await axios.post(bridgeUrl, { action: 'test_connection' }, {
+                timeout: 5000,
+                headers: { 'X-API-KEY': apiKey }
             });
 
             if (!testResponse.data.success) {
+                await this.logEvent(site, MonitoringEventType.SITE_DOWN, "Bridge connection failed", testResponse.data.trace);
                 throw new Error('DB 연결 실패');
             }
 
-            console.log(`[SpamHunter] DB Connection OK: ${testResponse.data.database}`);
+            // 2. Select Target Board
+            const table = site.target_board_table;
+            if (!table) {
+                await this.logEvent(site, MonitoringEventType.MAPPING_FAILED, "No target board selected for monitoring.");
+                return { detected: 0, message: "Target board not set" };
+            }
 
-            // 2. 최근 게시물 가져오기 (고급 분석용)
+            // 3. Windowed Scan (7-day cap policy for v1.5)
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            let sinceDate = site.last_scanned_at;
+
+            if (!sinceDate || sinceDate < sevenDaysAgo) {
+                sinceDate = sevenDaysAgo;
+            }
+
+            console.log(`[SpamHunter] Scanning ${table} since ID: ${site.last_scanned_id || 0}, Date: ${sinceDate.toISOString()}`);
+
             const fetchResponse = await axios.post(bridgeUrl, {
                 action: 'fetch_recent_posts',
-                table: 'g5_write_free',
-                limit: 20
+                table: table,
+                limit: 20,
+                last_id: site.last_scanned_id || 0,
+                since_date: sinceDate.toISOString().replace('T', ' ').substring(0, 19) // PHP-ready format
             }, {
-                timeout: 15000,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                timeout: 10000,
+                headers: { 'X-API-KEY': apiKey }
             });
 
             if (!fetchResponse.data.success) {
-                const errorMsg = fetchResponse.data.error || 'Failed to fetch posts';
-
-                // 테이블이 없는 경우 경고만 표시하고 계속 진행
-                if (errorMsg.includes('존재하지 않습니다') || errorMsg.includes('not exist')) {
-                    console.log(`[SpamHunter] Warning: ${errorMsg}`);
-                    console.log(`[SpamHunter] Skipping spam scan - no board tables found`);
-                    return { detected: 0, deleted: 0 };
-                }
-
-                throw new Error(errorMsg);
+                await this.logEvent(site, MonitoringEventType.MAPPING_FAILED, `Failed to fetch from ${table}`, fetchResponse.data.trace);
+                return { detected: 0, message: "Fetch failed" };
             }
 
             const posts: SpamPost[] = fetchResponse.data.posts || [];
-            console.log(`[SpamHunter] Fetched ${posts.length} recent posts for analysis`);
+            console.log(`[SpamHunter] Bridge returned ${posts.length} posts.`);
 
-            // 3. 고급 스팸 필터 적용
-            let detectedCount = 0;
-            const spamIds: number[] = [];
+            let totalDetected = 0;
+            let lastId = site.last_scanned_id;
+            let lastDate = site.last_scanned_at;
 
             for (const post of posts) {
-                const fullText = `${post.wr_subject} ${post.wr_content}`;
-                let isSpam = false;
-                let reason = '';
+                const judgment = this.judgeSpam(post);
+                console.log(`[SpamHunter] Item ID: ${post.id}, Score: ${judgment.score}, isSpam: ${judgment.isSpam}, Content: ${post.subject}`);
 
-                // 키워드 체크
-                const keywords = ['카지노', '바다이야기', '도박', '슬롯', '토토'];
-                if (keywords.some(kw => fullText.includes(kw))) {
-                    isSpam = true;
-                    reason = 'Keyword match';
+                if (judgment.isSpam) {
+                    totalDetected++;
+                    await this.logEvent(site, MonitoringEventType.SPAM_DETECTED,
+                        `Spam detected in ${table} (ID: ${post.id})`,
+                        fetchResponse.data.trace,
+                        { reasons: judgment.reasons, score: judgment.score, post_id: post.id }
+                    );
                 }
 
-                // 엔트로피 체크 (외계어 탐지)
-                if (!isSpam && this.calculateEntropy(fullText) > 4.5) {
-                    isSpam = true;
-                    reason = 'High entropy (gibberish)';
-                }
-
-                // 전화번호 유효성 체크
-                if (!isSpam && post.wr_hp && !this.isValidPhoneNumber(post.wr_hp)) {
-                    isSpam = true;
-                    reason = 'Invalid phone number';
-                }
-
-                if (isSpam) {
-                    detectedCount++;
-                    spamIds.push(post.wr_id);
-                    console.log(`[SpamHunter] 🚨 Spam detected (ID: ${post.wr_id}): ${reason}`);
-                }
+                // Update markers
+                lastId = post.id.toString();
+                lastDate = new Date(post.date);
             }
 
-            console.log(`[SpamHunter] Advanced scan complete: ${detectedCount} spam posts detected`);
+            // 4. Update Site State (Checkpoint)
+            if (posts.length > 0) {
+                site.last_scanned_id = lastId;
+                site.last_scanned_at = lastDate;
+                site.last_checked_at = new Date();
+                await siteRepo.save(site);
+            }
 
-            return { detected: detectedCount, deleted: 0 };
+            return { detected: totalDetected, message: `Scan complete. ${totalDetected} spam found.` };
 
         } catch (error: any) {
             console.error(`[SpamHunter] Error: ${error.message}`);
-
-            // 더 자세한 에러 정보 로깅
-            if (error.response) {
-                console.error(`[SpamHunter] Response status: ${error.response.status}`);
-                console.error(`[SpamHunter] Response data:`, error.response.data);
-            }
-
-            throw new Error(`DB 접속 실패: ${error.message}`);
+            throw error;
         }
+    }
+
+    private judgeSpam(post: SpamPost): SpamJudgment {
+        const reasons: string[] = [];
+        let score = 0;
+        const fullText = `${post.subject} ${post.content}`;
+
+        // Phase 1: Keywords (Strong signal)
+        const keywords = ['카지노', '바다이야기', '도박', '슬롯', '토토'];
+        if (keywords.some(kw => fullText.includes(kw))) {
+            reasons.push("Keyword match (Gambling)");
+            score += 0.8;
+        }
+
+        // Phase 2: Entropy (Gibberish)
+        const entropy = this.calculateEntropy(fullText);
+        if (entropy > 4.5) {
+            reasons.push(`High entropy (${entropy.toFixed(2)}) - Gibberish detected`);
+            score += 0.5;
+        }
+
+        // Phase 3: Phone Pattern
+        if (post.hp && !this.isValidPhoneNumber(post.hp)) {
+            reasons.push("Suspicious phone number pattern");
+            score += 0.4;
+        }
+
+        return {
+            isSpam: score >= 0.7, // v1 threshold
+            reasons,
+            score: Math.min(score, 1.0)
+        };
+    }
+
+    private async logEvent(site: Site, type: MonitoringEventType, message: string, trace?: string[], meta?: any) {
+        const logRepo = AppDataSource.getRepository(MonitoringLog);
+        const log = logRepo.create({
+            site,
+            event_type: type,
+            message,
+            trace,
+            meta
+        });
+        await logRepo.save(log);
+        console.log(`[EventLog] ${type}: ${message}`);
     }
 
     /**
