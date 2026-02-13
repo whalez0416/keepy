@@ -309,7 +309,8 @@
                             장애 감지 시 서버 자동 재시작 활성화
                         </label>
                         <div style="display: flex; gap: 10px; width: 100%;">
-                            <button class="btn-primary" onclick="alert('설정이 저장되었습니다.')" style="flex: 1;">설정 저장</button>
+                            <button class="btn-primary" onclick="saveMonitoringInterval()" style="flex: 1;">설정
+                                저장</button>
                             <button class="btn-primary" onclick="triggerManualScan()"
                                 style="background: var(--text-main); flex: 1;">즉시 검사</button>
                         </div>
@@ -627,6 +628,33 @@
             document.getElementById('priceDisplay').innerText = priceMap[interval];
         }
 
+        async function saveMonitoringInterval() {
+            if (!window.currentSiteId) {
+                alert('등록된 사이트가 없습니다.');
+                return;
+            }
+
+            const interval = parseInt(document.getElementById('intervalSelect').value);
+
+            try {
+                const response = await authFetch(`/sites/${window.currentSiteId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ monitoring_interval: interval })
+                });
+
+                if (response && response.ok) {
+                    alert(`모니터링 주기가 ${interval}분으로 저장되었습니다.`);
+                    // Refresh dashboard to show updated settings
+                    fetchDashboardData();
+                } else {
+                    alert('설정 저장 실패');
+                }
+            } catch (error) {
+                console.error('Save interval failed:', error);
+                alert('오류가 발생했습니다.');
+            }
+        }
+
         async function saveSettings() {
             if (!window.currentSiteId) {
                 alert('등록된 사이트가 없습니다.');
@@ -669,6 +697,13 @@
 
                     const site = sites[0]; // Primary site
                     window.currentSiteId = site.id; // Store for updates
+
+                    // Set monitoring interval dropdown to match database value
+                    const intervalSelect = document.getElementById('intervalSelect');
+                    if (intervalSelect && site.monitoring_interval) {
+                        intervalSelect.value = site.monitoring_interval;
+                        updatePrice(); // Update price display to match
+                    }
 
                     // Set specific board input if exists
                     if (site.specific_board_table) {
