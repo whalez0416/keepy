@@ -13,6 +13,8 @@ import { requireAuth } from "./middleware/auth.middleware.js";
 import { requireAdmin } from "./middleware/admin.middleware.js";
 import { SeedService } from "./services/seed.service.js";
 import { startMonitoring } from "./controllers/monitoring.scheduler.js";
+import { PasswordController } from "./controllers/password.controller.js";
+import { SupportController } from "./controllers/support.controller.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +66,7 @@ app.post("/auth/register", AuthController.register);
 app.post("/auth/login", AuthController.login);
 app.get("/auth/me", requireAuth, AuthController.getCurrentUser);
 app.patch("/auth/profile", requireAuth, AuthController.updateProfile);
+app.post("/auth/change-password", requireAuth, PasswordController.changePassword);
 
 // Admin Routes (Admin only)
 app.get("/admin/users", requireAuth, requireAdmin, AdminController.getAllUsers);
@@ -82,6 +85,15 @@ app.post("/monitoring/scan", requireAuth, SiteController.manualScan);
 // Spam Logs v1.5
 app.get("/api/spam-logs", requireAuth, SiteController.getSpamLogs);
 app.post("/api/spam-logs/:logId/delete", requireAuth, SiteController.deleteSpamPost);
+
+// Support Ticket Routes
+app.post("/api/support/tickets", requireAuth, SupportController.createTicket);
+app.get("/api/support/tickets", requireAuth, SupportController.getMyTickets);
+app.get("/api/support/tickets/unread-count", requireAuth, requireAdmin, SupportController.getUnreadCount);
+app.get("/api/support/admin/tickets", requireAuth, requireAdmin, SupportController.getAllTickets);
+app.post("/api/support/admin/tickets/:ticketId/read", requireAuth, requireAdmin, SupportController.markAsRead);
+app.post("/api/support/admin/tickets/:ticketId/respond", requireAuth, requireAdmin, SupportController.respondToTicket);
+app.patch("/api/support/admin/tickets/:ticketId/status", requireAuth, requireAdmin, SupportController.updateTicketStatus);
 
 // Billing
 app.get("/billing/estimate", (req: Request, res: Response) => {

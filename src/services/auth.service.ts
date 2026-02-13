@@ -57,6 +57,11 @@ export class AuthService {
             throw new Error('Invalid credentials');
         }
 
+        // Check if user is OAuth user (no password)
+        if (!user.password_hash || user.provider !== 'local') {
+            throw new Error('소셜 로그인 계정입니다. 해당 소셜 서비스로 로그인해주세요.');
+        }
+
         // Verify password
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {

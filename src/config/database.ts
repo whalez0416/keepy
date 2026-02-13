@@ -6,6 +6,7 @@ import { User } from "../models/User.js";
 import { Site } from "../models/Site.js";
 import { MonitoringLog } from "../models/MonitoringLog.js";
 import { SiteMember } from "../models/SiteMember.js";
+import { SupportTicket } from "../models/SupportTicket.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,7 +36,7 @@ export const AppDataSource = new DataSource({
     // DISABLED: Use migrations instead of synchronize
     synchronize: false,
     logging: process.env.NODE_ENV !== "production",
-    entities: [User, Site, MonitoringLog, SiteMember],
+    entities: [User, Site, MonitoringLog, SiteMember, SupportTicket],
     migrations: ["dist/migrations/**/*.js"],
     subscribers: [],
 });

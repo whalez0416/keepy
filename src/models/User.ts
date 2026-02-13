@@ -9,8 +9,8 @@ export class User {
     @Column({ unique: true })
     email!: string;
 
-    @Column()
-    password_hash!: string;
+    @Column({ nullable: true }) // Nullable for OAuth users (social login)
+    password_hash?: string;
 
     @Column()
     name!: string;
@@ -26,6 +26,13 @@ export class User {
 
     @Column({ default: "free" })
     subscription_type!: string; // "free", "basic", "pro", "enterprise"
+
+    // OAuth Support Fields
+    @Column({ default: "local" }) // 'local', 'kakao', 'google', 'naver', etc.
+    provider!: string;
+
+    @Column({ nullable: true }) // Provider's unique user ID
+    provider_id?: string;
 
     // Legacy relationship (backward compatibility)
     @OneToMany("Site", "user")
