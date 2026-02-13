@@ -12,6 +12,7 @@ import { AdminController } from "./controllers/admin.controller.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 import { requireAdmin } from "./middleware/admin.middleware.js";
 import { SeedService } from "./services/seed.service.js";
+import { startMonitoring } from "./controllers/monitoring.scheduler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,6 +112,9 @@ AppDataSource.initialize()
 
         // Seed admin account if needed
         await SeedService.seedAdminIfNeeded();
+
+        // Start monitoring scheduler
+        startMonitoring();
     })
     .catch((error) => {
         console.error("❌ Database connection failed:", error.message);
