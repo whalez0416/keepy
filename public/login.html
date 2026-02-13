@@ -202,7 +202,7 @@
                     localStorage.setItem('keepy_user', JSON.stringify(data.user));
 
                     // Redirect to dashboard
-                    window.location.href = '/dashboard';
+                    window.location.href = '/dashboard.html';
                 } else {
                     errorMsg.textContent = data.error || '오류가 발생했습니다.';
                     errorMsg.style.display = 'block';
