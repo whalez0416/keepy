@@ -593,7 +593,7 @@
             const phone = document.getElementById('profilePhone').value;
             const password = document.getElementById('profilePassword').value;
 
-            const response = await authFetch('http://localhost:3000/auth/profile', {
+            const response = await authFetch('/auth/profile', {
                 method: 'PATCH',
                 body: JSON.stringify({ name, phone, password: password || undefined })
             });
@@ -636,7 +636,7 @@
             const specificBoard = document.getElementById('specificBoardTable').value;
 
             try {
-                const response = await authFetch(`http://localhost:3000/sites/${window.currentSiteId}`, {
+                const response = await authFetch(`/sites/${window.currentSiteId}`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         specific_board_table: specificBoard
@@ -657,7 +657,7 @@
         async function fetchDashboardData() {
             try {
                 // 1. Fetch Sites (with auth)
-                const sitesRes = await authFetch('http://localhost:3000/sites');
+                const sitesRes = await authFetch('/sites');
                 if (!sitesRes) return;
 
                 const sites = await sitesRes.json();
@@ -703,7 +703,7 @@
                 }
 
                 // 2. Fetch Logs (with auth)
-                const logsRes = await authFetch('http://localhost:3000/monitoring/logs');
+                const logsRes = await authFetch('/monitoring/logs');
                 if (!logsRes) return;
 
                 const logs = await logsRes.json();
@@ -720,7 +720,7 @@
 
         async function fetchAndDisplayLogs() {
             try {
-                const response = await authFetch('http://localhost:3000/monitoring/logs');
+                const response = await authFetch('/monitoring/logs');
                 if (!response) return;
 
                 const logs = await response.json();
@@ -759,7 +759,7 @@
             resultEl.innerHTML = '<div style="color: var(--primary);">등록 중...</div>';
 
             try {
-                const response = await authFetch('http://localhost:3000/sites/register-db', {
+                const response = await authFetch('/sites/register-db', {
                     method: 'POST',
                     body: JSON.stringify({
                         host: 'localhost',
@@ -795,7 +795,7 @@
         }
 
         async function fetchAdminSites() {
-            const res = await authFetch('http://localhost:3000/sites');
+            const res = await authFetch('/sites');
             if (res && res.ok) {
                 const sites = await res.json();
                 const select = document.getElementById('siteFilter');
@@ -822,7 +822,7 @@
         async function fetchAndDisplaySpamLogs() {
             try {
                 const siteId = document.getElementById('siteFilter').value;
-                const url = `http://localhost:3000/api/spam-logs?days=7${siteId ? `&site_id=${siteId}` : ''}`;
+                const url = `/api/spam-logs?days=7${siteId ? `&site_id=${siteId}` : ''}`;
                 const response = await authFetch(url);
                 if (!response) return;
 
@@ -883,7 +883,7 @@
         async function deleteSpamPost(logId) {
             if (!confirm('해당 게시물을 실제 홈페이지에서 삭제합니다. 되돌릴 수 없습니다. 진행하시겠습니까?')) return;
 
-            const res = await authFetch(`http://localhost:3000/api/spam-logs/${logId}/delete`, { method: 'POST' });
+            const res = await authFetch(`/api/spam-logs/${logId}/delete`, { method: 'POST' });
             if (!res) return;
 
             if (res.ok) {

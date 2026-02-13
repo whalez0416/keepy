@@ -384,7 +384,7 @@
         }
 
         async function loadStats() {
-            const response = await authFetch('http://localhost:3000/admin/stats');
+            const response = await authFetch('/admin/stats');
             if (!response) return;
 
             const data = await response.json();
@@ -398,7 +398,7 @@
         }
 
         async function loadUsers() {
-            const response = await authFetch('http://localhost:3000/admin/users');
+            const response = await authFetch('/admin/users');
             if (!response) return;
 
             const data = await response.json();
@@ -454,7 +454,7 @@
             document.getElementById('userModal').classList.add('active');
             document.getElementById('modalContent').innerHTML = '<div class="loading">로딩 중...</div>';
 
-            const response = await authFetch(`http://localhost:3000/admin/users/${userId}`);
+            const response = await authFetch(`/admin/users/${userId}`);
             if (!response) return;
 
             const data = await response.json();
@@ -539,7 +539,7 @@
         }
 
         async function performUserUpdate(userId, role, subscription_type) {
-            const response = await authFetch(`http://localhost:3000/admin/users/${userId}`, {
+            const response = await authFetch(`/admin/users/${userId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ role, subscription_type })
             });
