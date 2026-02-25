@@ -2,6 +2,7 @@ import axios from "axios";
 import { AppDataSource } from "../config/database.js";
 import { Site } from "../models/Site.js";
 import { MonitoringLog, MonitoringEventType } from "../models/MonitoringLog.js";
+import { buildBridgeHeaders } from "../utils/bridgeAuth.js";
 
 interface SpamPost {
     id: number | string;
@@ -33,13 +34,25 @@ export class SpamHunterService {
 
         try {
             const bridgeUrl = `https://${site.domain}/keepy_bridge.php`;
-            const apiKey = "keepy_secret_2024";
+
+            // Use the site-specific API key (never a shared/hardcoded key)
+            const siteWithKey = await siteRepo.findOne({
+                where: { id: siteId },
+                select: ['id', 'domain', 'target_board_table', 'last_scanned_id', 'last_scanned_at', 'bridge_api_key'] as any
+            });
+            const apiKey = siteWithKey?.bridge_api_key;
+            if (!apiKey) {
+                console.warn(`[SpamHunter] Site ${site.domain} has no bridge_api_key. Skipping scan.`);
+                await this.logEvent(site, MonitoringEventType.MAPPING_FAILED, "bridge_api_key not set. Re-deploy bridge via FTP upload script.");
+                return { detected: 0, message: "bridge_api_key not configured" };
+            }
 
             // 1. Connection & Trace Check
             const testResponse = await axios.post(bridgeUrl, { action: 'test_connection' }, {
                 timeout: 5000,
-                headers: { 'X-API-KEY': apiKey }
+                headers: buildBridgeHeaders(apiKey)
             });
+
 
             if (!testResponse.data.success) {
                 await this.logEvent(site, MonitoringEventType.SITE_DOWN, "Bridge connection failed", testResponse.data.trace);

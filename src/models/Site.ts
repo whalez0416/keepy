@@ -112,6 +112,11 @@ export class Site {
     @Column({ default: false })
     can_user_delete_spam!: boolean;
 
+    // Security: per-site unique API key for bridge authentication
+    // Auto-generated as UUID when site is registered. Embedded into bridge PHP on deploy.
+    @Column({ nullable: true, select: false })
+    bridge_api_key?: string;
+
     // Tracking fields
     @Column({ nullable: true })
     last_scanned_id?: string;

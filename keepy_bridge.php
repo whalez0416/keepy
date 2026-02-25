@@ -1,24 +1,47 @@
 <?php
 /**
  * Keepy Universal DB Bridge
- * Version: 1.1.1 (Hospital v1 Edition)
+ * Version: 2.0.0 (Secured Edition)
+ *
+ * Security:
+ *   - Site-specific API key (replaced at deploy time)
+ *   - HMAC-SHA256 request signature + timestamp validation (replay attack prevention)
+ *   - CORS restricted to Keepy server only
  */
 
 error_reporting(0);
+
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// Only allow requests from the Keepy server (Render).
+$allowed_origin = 'https://keepy-pqfo.onrender.com';
+$request_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if ($request_origin === $allowed_origin) {
+    header('Access-Control-Allow-Origin: ' . $allowed_origin);
+} else {
+    // Server-to-server calls (no Origin header) are allowed — origin will be empty.
+    // Browser cross-origin calls from unknown origins are blocked.
+    if (!empty($request_origin)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Origin not allowed']);
+        exit;
+    }
+}
+
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-API-KEY');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-API-KEY, X-TIMESTAMP, X-SIGNATURE');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// Config
-$API_KEY = 'keepy_secret_2024';
-$VERSION = '1.2.0';
-$ALLOW_DEBUG = false; 
+// ── Config ────────────────────────────────────────────────────────────────────
+// ##KEEPY_API_KEY## is replaced by the deploy script with the site's unique key.
+$API_KEY     = '##KEEPY_API_KEY##';
+$VERSION     = '2.0.0';
+$ALLOW_DEBUG = false;
 
 $execution_trace = [];
 
@@ -46,15 +69,56 @@ function get_success_trace() {
     return $summary;
 }
 
-// Security Check
-if (isset($_SERVER['HTTP_X_API_KEY']) && $_SERVER['HTTP_X_API_KEY'] !== $API_KEY) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Invalid API key', 'trace' => $execution_trace]);
-    exit;
+// ── Authentication ───────────────────────────────────────────────────────────
+/**
+ * Validates the incoming request using HMAC-SHA256 signature + timestamp.
+ *
+ * Required headers:
+ *   X-API-KEY   : site-specific API key (matches $API_KEY above)
+ *   X-TIMESTAMP : Unix timestamp of request (seconds)
+ *   X-SIGNATURE : HMAC-SHA256( api_key . timestamp, api_key )
+ *
+ * Replay attack prevention: timestamp must be within ±300 seconds of server time.
+ */
+function validate_request(string $api_key): bool {
+    $provided_key  = $_SERVER['HTTP_X_API_KEY']  ?? '';
+    $timestamp     = $_SERVER['HTTP_X_TIMESTAMP'] ?? '';
+    $signature     = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
+
+    // Key must match
+    if (!hash_equals($api_key, $provided_key)) {
+        return false;
+    }
+
+    // Timestamp must be a valid integer
+    if (!ctype_digit($timestamp)) {
+        return false;
+    }
+
+    // Timestamp must be within ±5 minutes
+    $skew = abs(time() - (int)$timestamp);
+    if ($skew > 300) {
+        return false;
+    }
+
+    // Signature must match  HMAC-SHA256( api_key . timestamp, api_key )
+    $expected = hash_hmac('sha256', $api_key . $timestamp, $api_key);
+    return hash_equals($expected, $signature);
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
+// Allow status check without auth (just returns service metadata, no DB access)
+$input  = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $input['action'] ?? ($_GET['action'] ?? 'status');
+
+if ($action !== 'status') {
+    if (!validate_request($API_KEY)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Unauthorized: invalid key, timestamp, or signature']);
+        exit;
+    }
+}
+
+// ($input and $action already parsed above in the auth block)
 
 // Step 1: Baseline Status (No DB Access)
 if ($action === 'status') {
@@ -102,14 +166,20 @@ function discover_db_config() {
         }
     }
 
-    log_trace('DB_DISCOVERY', 'No CMS config found. Using manual fallback.');
-    return [
-        'host' => 'localhost', 'user' => 'minhospital2008', 'pass' => 'minho3114*', 'name' => 'minhospital2008', 'cms' => 'manual'
-    ];
+    // No CMS config found and no hardcoded fallback (removed for security).
+    log_trace('DB_DISCOVERY', 'No CMS config found. Cannot connect.');
+    return null;
 }
 
 try {
     $dbConfig = discover_db_config();
+
+    if ($dbConfig === null) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'DB_CONFIG_NOT_FOUND: No CMS configuration detected on this server.']);
+        exit;
+    }
+
     $pdo = new PDO(
         "mysql:host={$dbConfig['host']};dbname={$dbConfig['name']};charset=utf8mb4",
         $dbConfig['user'], $dbConfig['pass'],
