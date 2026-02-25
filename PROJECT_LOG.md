@@ -29,14 +29,20 @@
 - `deleteSpamPost` API 권한 검증 로직 구현
 
 ### 2026-02-25 - Bridge 보안 강화 v2.0 ✅
-- **변경 파일 (15개)**: `keepy_bridge.php`, `Site.ts`, `spam-hunter.service.ts`, `src/utils/bridgeAuth.ts`, `src/scripts/add_missing_columns.ts`, `src/scripts/upload_bridge_ftp.ts` 등
-- **주요 변경**: 공통 API 키(`keepy_secret_2024`) 제거 → 사이트별 UUID 고유 키 발급
-- **HMAC-SHA256 서명 검증** 추가 (리플레이 공격 방지, ±5분 타임스탬프)
+- **변경 파일**: `keepy_bridge.php`, `Site.ts`, `spam-hunter.service.ts`, `src/utils/bridgeAuth.ts`, `src/scripts/add_missing_columns.ts`, `src/scripts/upload_bridge_ftp.ts`, `src/scripts/set_ftp_credentials.ts`, `src/scripts/set_db_credentials.ts`, `src/scripts/test_bridge_security.ts`
+- **구조 변화**: Bridge 파일에 DB 비밀번호 완전 제거 → Keepy 서버가 HMAC 서명된 요청 body에 DB 정보를 담아 전송
+- **보안 추가**: HMAC-SHA256 서명 검증 (±5분 타임스탬프, 리플레이 공격 방지)
 - **CORS** `*` → `https://keepy-pqfo.onrender.com` 로 제한
-- **하드코딩 DB 비밀번호** (`minho3114*`) bridge 파일에서 완전 제거
-- **FTP 업로드**: minhospital.co.kr 서버에 v2.0 배포 완료
-- **Render 배포**: git push → 자동 배포 트리거됨
-- 커밋: `b2c8618` — security: HMAC bridge auth + per-site API key (v2.0)
+- **FTP 배포 완료**: minhospital.co.kr에 v2.0 실서버 배포
+- **보안 테스트**: 403 케이스 3개 모두 PASS, status 엔드포인트 v2.0.0 응답 확인
+- **커밋**: `b2c8618`, `ce302c9`
+
+### ⚠️ 미해결 이슈 (다음 세션)
+- **Case 1 DB 연결 실패**: `Access denied for user 'minhospital2008'@'localhost'`
+  - 원인: Cafe24 MySQL의 실제 DB 호스트가 `localhost`가 아닐 가능성 높음
+  - **확인 방법**: Cafe24 호스팅 관리자 → DB 관리 → 호스트 주소 확인
+  - Keepy DB의 `sites.db_host` 값을 실제 Cafe24 MySQL 호스트로 업데이트 필요
+  - 업데이트 명령: `node --loader ts-node/esm src/scripts/set_db_credentials.ts` 수정 후 재실행
 
 ### Phase 2 - 멀티테넌트 아키텍처 (2026-02-12)
 - `SiteMember` 엔티티 생성 (User ↔ Site N:M 관계)
