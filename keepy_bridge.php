@@ -120,72 +120,43 @@ if ($action !== 'status') {
 
 // ($input and $action already parsed above in the auth block)
 
-// Step 1: Baseline Status (No DB Access)
+// Step 1: Baseline Status (No DB Access — no auth required)
 if ($action === 'status') {
     echo json_encode([
-        'status' => 'ok',
-        'service' => 'Keepy Universal Bridge',
-        'version' => $VERSION,
-        'capabilities' => ['list_boards', 'fetch_posts', 'debug_spam_check']
+        'status'       => 'ok',
+        'service'      => 'Keepy Universal Bridge',
+        'version'      => $VERSION,
+        'auth'         => 'HMAC-SHA256',
+        'capabilities' => ['list_boards', 'fetch_posts', 'delete_post'],
     ]);
     exit;
 }
 
-/**
- * DB Configuration Auto-Discovery
- */
-function discover_db_config() {
-    log_trace('DB_DISCOVERY', 'Starting auto-discovery...');
-    $root = $_SERVER['DOCUMENT_ROOT'];
-    
-    $configs = [
-        ['path' => 'data/dbconfig.php', 'type' => 'gnuboard5'],
-        ['path' => '../data/dbconfig.php', 'type' => 'gnuboard5'],
-        ['path' => 'wp-config.php', 'type' => 'wordpress'],
-        ['path' => '../wp-config.php', 'type' => 'wordpress'],
-    ];
-    
-    foreach ($configs as $cfg) {
-        $fullPath = $root . DIRECTORY_SEPARATOR . $cfg['path'];
-        if (file_exists($fullPath)) {
-            $content = file_get_contents($fullPath);
-            log_trace('DB_DISCOVERY', "Found config at: {$cfg['path']} ({$cfg['type']})");
-            
-            if ($cfg['type'] === 'gnuboard5') {
-                preg_match("/G5_MYSQL_HOST', '(.+)'/", $content, $host);
-                preg_match("/G5_MYSQL_USER', '(.+)'/", $content, $user);
-                preg_match("/G5_MYSQL_PASSWORD', '(.+)'/", $content, $pass);
-                preg_match("/G5_MYSQL_DB', '(.+)'/", $content, $db);
-                
-                if (!empty($host[1])) {
-                    return [
-                        'host' => $host[1], 'user' => $user[1], 'pass' => $pass[1], 'name' => $db[1], 'cms' => $cfg['type']
-                    ];
-                }
-            }
-        }
-    }
-
-    // No CMS config found and no hardcoded fallback (removed for security).
-    log_trace('DB_DISCOVERY', 'No CMS config found. Cannot connect.');
-    return null;
-}
-
+// ── DB Connection ────────────────────────────────────────────────────────────
+// DB credentials are passed in the signed request body by the Keepy server.
+// The bridge file itself stores NO database credentials (maximum security).
 try {
-    $dbConfig = discover_db_config();
+    $db_host = $input['db_host'] ?? '';
+    $db_user = $input['db_user'] ?? '';
+    $db_pass = $input['db_pass'] ?? '';
+    $db_name = $input['db_name'] ?? '';
+    $db_port = $input['db_port'] ?? '3306';
 
-    if ($dbConfig === null) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'DB_CONFIG_NOT_FOUND: No CMS configuration detected on this server.']);
+    if (empty($db_host) || empty($db_user) || empty($db_name)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'DB_PARAMS_MISSING: db_host, db_user, db_name are required in request body.']);
         exit;
     }
 
+    log_trace('DB_CONNECT', "Connecting to {$db_name}@{$db_host}:{$db_port}");
+
     $pdo = new PDO(
-        "mysql:host={$dbConfig['host']};dbname={$dbConfig['name']};charset=utf8mb4",
-        $dbConfig['user'], $dbConfig['pass'],
+        "mysql:host={$db_host};port={$db_port};dbname={$db_name};charset=utf8mb4",
+        $db_user, $db_pass,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
     );
-    log_trace('DB_CONNECT', "Connected to: {$dbConfig['name']}");
+    log_trace('DB_CONNECT', "Connected to: {$db_name}");
+
 
     switch ($action) {
         case 'test_connection':

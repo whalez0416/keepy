@@ -35,24 +35,34 @@ export class SpamHunterService {
         try {
             const bridgeUrl = `https://${site.domain}/keepy_bridge.php`;
 
-            // Use the site-specific API key (never a shared/hardcoded key)
-            const siteWithKey = await siteRepo.findOne({
-                where: { id: siteId },
-                select: ['id', 'domain', 'target_board_table', 'last_scanned_id', 'last_scanned_at', 'bridge_api_key'] as any
-            });
-            const apiKey = siteWithKey?.bridge_api_key;
+            // Fetch site with all select:false fields (api key + db credentials)
+            const siteWithSecrets = await AppDataSource.query(`
+                SELECT bridge_api_key, db_host, db_user, db_pass, db_name, db_port
+                FROM sites WHERE id = $1
+            `, [siteId]);
+            const secrets = siteWithSecrets[0];
+
+            const apiKey = secrets?.bridge_api_key as string | undefined;
             if (!apiKey) {
                 console.warn(`[SpamHunter] Site ${site.domain} has no bridge_api_key. Skipping scan.`);
-                await this.logEvent(site, MonitoringEventType.MAPPING_FAILED, "bridge_api_key not set. Re-deploy bridge via FTP upload script.");
+                await this.logEvent(site, MonitoringEventType.MAPPING_FAILED, "bridge_api_key not set. Run add_missing_columns script.");
                 return { detected: 0, message: "bridge_api_key not configured" };
             }
 
-            // 1. Connection & Trace Check
-            const testResponse = await axios.post(bridgeUrl, { action: 'test_connection' }, {
-                timeout: 5000,
-                headers: buildBridgeHeaders(apiKey)
-            });
+            // DB credentials to pass in every bridge request body (bridge stores NO creds)
+            const dbParams = {
+                db_host: secrets.db_host || 'localhost',
+                db_user: secrets.db_user || '',
+                db_pass: secrets.db_pass || '',
+                db_name: secrets.db_name || '',
+                db_port: secrets.db_port || '3306',
+            };
 
+            // 1. Connection & Trace Check
+            const testResponse = await axios.post(bridgeUrl,
+                { action: 'test_connection', ...dbParams },
+                { timeout: 5000, headers: buildBridgeHeaders(apiKey) }
+            );
 
             if (!testResponse.data.success) {
                 await this.logEvent(site, MonitoringEventType.SITE_DOWN, "Bridge connection failed", testResponse.data.trace);
@@ -78,13 +88,14 @@ export class SpamHunterService {
 
             const fetchResponse = await axios.post(bridgeUrl, {
                 action: 'fetch_recent_posts',
+                ...dbParams,
                 table: table,
                 limit: 20,
                 last_id: site.last_scanned_id || 0,
-                since_date: sinceDate.toISOString().replace('T', ' ').substring(0, 19) // PHP-ready format
+                since_date: sinceDate.toISOString().replace('T', ' ').substring(0, 19)
             }, {
                 timeout: 10000,
-                headers: { 'X-API-KEY': apiKey }
+                headers: buildBridgeHeaders(apiKey)
             });
 
             if (!fetchResponse.data.success) {

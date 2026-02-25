@@ -28,6 +28,16 @@
 - 스팸 삭제 권한을 Admin 외 허가된 User도 가능하도록 확장
 - `deleteSpamPost` API 권한 검증 로직 구현
 
+### 2026-02-25 - Bridge 보안 강화 v2.0 ✅
+- **변경 파일 (15개)**: `keepy_bridge.php`, `Site.ts`, `spam-hunter.service.ts`, `src/utils/bridgeAuth.ts`, `src/scripts/add_missing_columns.ts`, `src/scripts/upload_bridge_ftp.ts` 등
+- **주요 변경**: 공통 API 키(`keepy_secret_2024`) 제거 → 사이트별 UUID 고유 키 발급
+- **HMAC-SHA256 서명 검증** 추가 (리플레이 공격 방지, ±5분 타임스탬프)
+- **CORS** `*` → `https://keepy-pqfo.onrender.com` 로 제한
+- **하드코딩 DB 비밀번호** (`minho3114*`) bridge 파일에서 완전 제거
+- **FTP 업로드**: minhospital.co.kr 서버에 v2.0 배포 완료
+- **Render 배포**: git push → 자동 배포 트리거됨
+- 커밋: `b2c8618` — security: HMAC bridge auth + per-site API key (v2.0)
+
 ### Phase 2 - 멀티테넌트 아키텍처 (2026-02-12)
 - `SiteMember` 엔티티 생성 (User ↔ Site N:M 관계)
 - RBAC 미들웨어 구현 (`requireSiteAccess`, `requireSiteRole`, `requirePermission`)
